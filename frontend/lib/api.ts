@@ -1,7 +1,7 @@
 // API client configured for React Native
 import axios from 'axios';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://inventoryapp-hyoz.onrender.com';
 
 // Create axios instance with proper configuration for React Native
 const apiClient = axios.create({
