@@ -55,7 +55,7 @@ export default function LoginScreen() {
 
         try {
             const response = await apiClient.post('/api/auth/login', {
-                name: selectedEmployee,
+                name: selectedEmployee.trim(),
                 pin: pin,
             });
 
