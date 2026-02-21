@@ -949,6 +949,10 @@ async def startup_prewarm():
     loop.run_in_executor(executor, _prewarm_projects)
     loop.run_in_executor(executor, _prewarm_employees)
 
+@app.get("/")
+async def root_app():
+    return {"message": "Chicago Bifold Inventory API Status: Online"}
+
 # Include the router in the main app
 app.include_router(api_router)
 
