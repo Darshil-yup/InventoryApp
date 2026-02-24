@@ -47,7 +47,8 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
     // Use shared context parts if available (avoid prop-drilling; context is faster after first load)
     const { parts: contextParts } = useMasterData();
     const parts = contextParts.length > 0 ? contextParts : propParts;
-    const [isEditMode, setIsEditMode] = useState(false);
+    const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [scannerVisible, setScannerVisible] = useState(false);
@@ -139,6 +140,17 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
         setLocationScanItemIndex(null);
     };
 
+    // Filter items based on search query
+    const filteredItems = inventoryItems.map((item, index) => ({ item, originalIndex: index })).filter(({ item }) => {
+        if (!searchQuery) return true;
+        const partDetails = parts.find(p => p.cbf_part_no === item.cbf_part_no);
+        const searchLower = searchQuery.toLowerCase();
+        return (
+            item.cbf_part_no.toLowerCase().includes(searchLower) ||
+            (partDetails?.part_description?.toLowerCase() || '').includes(searchLower)
+        );
+    });
+
     if (loading) {
         return (
             <Card style={styles.card}>
@@ -175,22 +187,22 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                             style={[
                                 styles.segmentButton,
                                 styles.segmentLeft,
-                                !isEditMode && styles.segmentActive,
-                                !isEditMode && { backgroundColor: colors.primary }
+                                editingRowIndex === null && styles.segmentActive,
+                                editingRowIndex === null && { backgroundColor: colors.primary }
                             ]}
-                            onPress={() => setIsEditMode(false)}
+                            onPress={() => setEditingRowIndex(null)}
                             activeOpacity={0.8}
                         >
                             <MaterialCommunityIcons
-                                name="eye-outline"
+                                name="format-list-bulleted"
                                 size={16}
-                                color={!isEditMode ? '#fff' : colors.textSecondary}
+                                color={editingRowIndex === null ? '#fff' : colors.textSecondary}
                             />
                             <Text style={[
                                 styles.segmentText,
-                                { color: !isEditMode ? '#fff' : colors.textSecondary }
+                                { color: editingRowIndex === null ? '#fff' : colors.textSecondary }
                             ]}>
-                                View
+                                View All
                             </Text>
                         </TouchableOpacity>
 
@@ -198,25 +210,45 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                             style={[
                                 styles.segmentButton,
                                 styles.segmentRight,
-                                isEditMode && styles.segmentActive,
-                                isEditMode && { backgroundColor: COLORS.warning }
+                                editingRowIndex !== null && styles.segmentActive,
+                                editingRowIndex !== null && { backgroundColor: COLORS.warning }
                             ]}
-                            onPress={() => setIsEditMode(true)}
+                            onPress={() => {
+                                if (editingRowIndex === null && filteredItems.length > 0) {
+                                    setEditingRowIndex(filteredItems[0].originalIndex);
+                                }
+                            }}
                             activeOpacity={0.8}
                         >
                             <MaterialCommunityIcons
                                 name="pencil"
                                 size={16}
-                                color={isEditMode ? '#fff' : colors.textSecondary}
+                                color={editingRowIndex !== null ? '#fff' : colors.textSecondary}
                             />
                             <Text style={[
                                 styles.segmentText,
-                                { color: isEditMode ? '#fff' : colors.textSecondary }
+                                { color: editingRowIndex !== null ? '#fff' : colors.textSecondary }
                             ]}>
-                                Edit
+                                Edit Row
                             </Text>
                         </TouchableOpacity>
                     </View>
+                </View>
+
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+                    <Input
+                        placeholder="Search by Part No. or Description..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        style={{ flex: 1, marginBottom: 0 }}
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+                            <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {inventoryItems.length === 0 ? (
@@ -225,134 +257,154 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                             No inventory recorded for this date
                         </Text>
-                        {isEditMode && (
+                        {editingRowIndex !== null && (
                             <Button
                                 title="Add First Item"
-                                onPress={addItem}
+                                onPress={() => { addItem(); setEditingRowIndex(0); }}
                                 style={styles.addButton}
                                 icon={<MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />}
                             />
                         )}
                     </View>
                 ) : (
-                    <ScrollView style={styles.itemsList}>
-                        {inventoryItems.map((item, index) => (
-                            <View key={index} style={[styles.itemCard, { backgroundColor: colors.card }]}>
-                                <View style={styles.itemHeader}>
-                                    <Text style={[styles.itemNumber, { color: colors.textSecondary }]}>
-                                        Item #{index + 1}
-                                    </Text>
-                                    {isEditMode && (
-                                        <TouchableOpacity onPress={() => removeItem(index)}>
-                                            <MaterialCommunityIcons name="delete" size={20} color="#ef4444" />
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
+                    <ScrollView
+                        style={styles.tableScrollView}
+                        stickyHeaderIndices={[0]}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {/* Sticky Table Header */}
+                        <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                            <Text style={[styles.tableHeaderText, { flex: 2, color: colors.textSecondary }]}>CBF Part No.</Text>
+                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Rack</Text>
+                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Level</Text>
+                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Bin</Text>
+                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Qty</Text>
+                        </View>
 
-                                {isEditMode ? (
-                                    <>
-                                        <SearchablePartSelector
-                                            parts={parts}
-                                            selectedPart={item.cbf_part_no}
-                                            onSelectPart={(partNo) => handlePartSelect(index, partNo)}
-                                            label="CBF Part Number"
-                                            showExternalScanner={true}
-                                        />
-                                        {/* Single QR scan fills Rack, Level & Bin */}
-                                        <TouchableOpacity
-                                            style={[styles.scanLocationBtn, { borderColor: colors.primary }]}
-                                            onPress={() => openLocationScanner(index)}
-                                        >
-                                            <MaterialCommunityIcons name="qrcode-scan" size={18} color={colors.primary} />
-                                            <Text style={[styles.scanLocationText, { color: colors.primary }]}>Scan Location (Rack–Level–Bin)</Text>
-                                        </TouchableOpacity>
+                        <View>
+                            {filteredItems.map(({ item, originalIndex }) => {
+                                const isEditing = editingRowIndex === originalIndex;
+                                const partDetails = parts.find(p => p.cbf_part_no === item.cbf_part_no);
 
-                                        <View style={styles.row}>
-                                            <View style={{ flex: 1 }}>
-                                                <Input
-                                                    label="Rack"
-                                                    value={item.rack}
-                                                    onChangeText={(val) => updateItem(index, 'rack', val)}
-                                                />
+                                if (isEditing) {
+                                    // EDIT MODE CARD
+                                    return (
+                                        <View key={originalIndex} style={[styles.itemCard, { backgroundColor: colors.card }]}>
+                                            <View style={styles.itemHeader}>
+                                                <TouchableOpacity
+                                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                                                    onPress={() => setEditingRowIndex(null)}
+                                                >
+                                                    <MaterialCommunityIcons name="chevron-up" size={24} color={colors.textSecondary} />
+                                                    <Text style={[styles.itemNumber, { color: colors.textSecondary, fontSize: 14 }]}>
+                                                        Editing Item #{originalIndex + 1}
+                                                    </Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity onPress={() => removeItem(originalIndex)}>
+                                                    <MaterialCommunityIcons name="delete" size={20} color="#ef4444" />
+                                                </TouchableOpacity>
                                             </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Input
-                                                    label="Level"
-                                                    value={item.level}
-                                                    onChangeText={(val) => updateItem(index, 'level', val)}
-                                                />
+
+                                            <SearchablePartSelector
+                                                parts={parts}
+                                                selectedPart={item.cbf_part_no}
+                                                onSelectPart={(partNo) => handlePartSelect(originalIndex, partNo)}
+                                                label="CBF Part Number"
+                                                showExternalScanner={true}
+                                            />
+                                            {/* Single QR scan fills Rack, Level & Bin */}
+                                            <TouchableOpacity
+                                                style={[styles.scanLocationBtn, { borderColor: colors.primary }]}
+                                                onPress={() => openLocationScanner(originalIndex)}
+                                            >
+                                                <MaterialCommunityIcons name="qrcode-scan" size={18} color={colors.primary} />
+                                                <Text style={[styles.scanLocationText, { color: colors.primary }]}>Scan Location (Rack–Level–Bin)</Text>
+                                            </TouchableOpacity>
+
+                                            <View style={styles.row}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Input
+                                                        label="Rack"
+                                                        value={item.rack}
+                                                        onChangeText={(val) => updateItem(originalIndex, 'rack', val)}
+                                                    />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Input
+                                                        label="Level"
+                                                        value={item.level}
+                                                        onChangeText={(val) => updateItem(originalIndex, 'level', val)}
+                                                    />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Input
+                                                        label="Bin"
+                                                        value={item.bin}
+                                                        onChangeText={(val) => updateItem(originalIndex, 'bin', val)}
+                                                    />
+                                                </View>
                                             </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Input
-                                                    label="Bin"
-                                                    value={item.bin}
-                                                    onChangeText={(val) => updateItem(index, 'bin', val)}
-                                                />
-                                            </View>
+                                            <Input
+                                                label="Quantity"
+                                                value={item.quantity.toString()}
+                                                onChangeText={(val) => updateItem(originalIndex, 'quantity', parseInt(val) || 0)}
+                                                keyboardType="numeric"
+                                            />
+                                            <Button
+                                                title="Done Editing"
+                                                onPress={() => setEditingRowIndex(null)}
+                                                style={{ marginTop: SPACING.md }}
+                                                variant="secondary"
+                                            />
                                         </View>
-                                        <Input
-                                            label="Quantity"
-                                            value={item.quantity.toString()}
-                                            onChangeText={(val) => updateItem(index, 'quantity', parseInt(val) || 0)}
-                                            keyboardType="numeric"
-                                        />
-                                    </>
-                                ) : (
-                                    <>
-                                        <View style={styles.infoRow}>
-                                            <Text style={[styles.label, { color: colors.textSecondary }]}>Part:</Text>
-                                            <Text style={[styles.value, { color: colors.textPrimary }]}>{item.cbf_part_no}</Text>
-                                        </View>
-                                        <View style={styles.infoRow}>
-                                            <Text style={[styles.label, { color: colors.textSecondary }]}>Vendor Part:</Text>
-                                            <Text style={[styles.value, { color: colors.textPrimary }]}>{item.vendor_part_no || 'N/A'}</Text>
-                                        </View>
-                                        <View style={styles.infoRow}>
-                                            <Text style={[styles.label, { color: colors.textSecondary }]}>Finish:</Text>
-                                            <Text style={[styles.value, { color: colors.textPrimary }]}>{item.finish || 'N/A'}</Text>
-                                        </View>
-                                        <View style={styles.locationRow}>
-                                            <View style={styles.locationBadge}>
-                                                <MaterialCommunityIcons name="warehouse" size={14} color={colors.primary} />
-                                                <Text style={[styles.locationText, { color: colors.textPrimary }]}>
-                                                    Rack: {item.rack}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.locationBadge}>
-                                                <MaterialCommunityIcons name="stairs" size={14} color={colors.primary} />
-                                                <Text style={[styles.locationText, { color: colors.textPrimary }]}>
-                                                    Level: {item.level}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.locationBadge}>
-                                                <MaterialCommunityIcons name="package-variant" size={14} color={colors.primary} />
-                                                <Text style={[styles.locationText, { color: colors.textPrimary }]}>
-                                                    Bin: {item.bin}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        <View style={styles.quantityRow}>
-                                            <MaterialCommunityIcons name="counter" size={18} color={COLORS.success} />
-                                            <Text style={[styles.quantityText, { color: colors.textPrimary }]}>
-                                                Quantity: <Text style={styles.quantityValue}>{item.quantity}</Text>
+                                    );
+                                }
+
+                                // VIEW MODE ROW
+                                return (
+                                    <TouchableOpacity
+                                        key={originalIndex}
+                                        style={[styles.tableRow, { borderBottomColor: colors.border }]}
+                                        onPress={() => setEditingRowIndex(originalIndex)}
+                                    >
+                                        <View style={{ flex: 2, paddingRight: SPACING.sm }}>
+                                            <Text style={[styles.partNumberText, { color: colors.textPrimary }]} numberOfLines={1}>
+                                                {item.cbf_part_no || '<Empty>'}
                                             </Text>
+                                            {partDetails && (
+                                                <Text style={[styles.partDescText, { color: colors.textSecondary }]} numberOfLines={1}>
+                                                    {partDetails.part_description}
+                                                </Text>
+                                            )}
                                         </View>
-                                    </>
-                                )}
-                            </View>
-                        ))}
 
-                        {isEditMode && (
-                            <Button
-                                title="Add Another Item"
-                                onPress={addItem}
-                                style={styles.addAnotherButton}
-                                variant="outline"
-                                icon={<MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />}
-                            />
-                        )}
+                                        <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>
+                                            {item.rack || '-'}
+                                        </Text>
+                                        <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>
+                                            {item.level || '-'}
+                                        </Text>
+                                        <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>
+                                            {item.bin || '-'}
+                                        </Text>
+                                        <Text style={[styles.cellText, { flex: 1, textAlign: 'right', color: colors.textPrimary }]}>
+                                            {item.quantity || 0}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
                     </ScrollView>
                 )}
+
+                <Button
+                    title="Add Another Item"
+                    onPress={() => { addItem(); setEditingRowIndex(inventoryItems.length); }}
+                    style={styles.addAnotherButton}
+                    variant="outline"
+                    icon={<MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />}
+                />
             </Card>
         </>
     );
@@ -517,8 +569,64 @@ const styles = StyleSheet.create({
         color: COLORS.success,
     },
     addAnotherButton: {
+        marginTop: SPACING.md,
+        marginBottom: SPACING.xl,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: SPACING.md,
+        gap: SPACING.sm,
+    },
+    searchIcon: {
+        marginLeft: SPACING.sm,
+        marginRight: -35, // Adjust this so the icon sits inside the input field padding
+        zIndex: 1,
+    },
+    clearSearchBtn: {
+        position: 'absolute',
+        right: SPACING.sm,
+        padding: SPACING.xs,
+    },
+    tableScrollView: {
+        maxHeight: 450,
+        backgroundColor: COLORS.card,
+        borderRadius: BORDER_RADIUS.md,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border,
         marginTop: SPACING.sm,
-        marginBottom: SPACING.md,
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        borderBottomWidth: 1,
+        alignItems: 'center',
+    },
+    tableHeaderText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    tableRow: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.md,
+        borderBottomWidth: 1,
+        alignItems: 'center',
+    },
+    partNumberText: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    partDescText: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    cellText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     scanLocationBtn: {
         flexDirection: 'row',
@@ -530,6 +638,7 @@ const styles = StyleSheet.create({
         borderStyle: 'dashed',
         paddingVertical: 10,
         marginBottom: 8,
+        marginTop: 8,
     },
     scanLocationText: {
         fontSize: 13,

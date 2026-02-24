@@ -59,7 +59,10 @@ export default function ProjectPartsViewer({
 }: ProjectPartsViewerProps) {
     const { isDark } = useTheme();
     const colors = getThemeColors(isDark);
-    const [isEditMode, setIsEditMode] = useState(false);
+
+    // Instead of global edit mode, we track which row is currently expanded for editing
+    const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [projectParts, setProjectParts] = useState<ProjectPart[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -128,6 +131,17 @@ export default function ProjectPartsViewer({
         return parts.find((p) => p.cbf_part_no === cbfPartNo);
     };
 
+    // Filter entries based on search query
+    const filteredEntries = entries.map((entry, index) => ({ entry, originalIndex: index })).filter(({ entry }) => {
+        if (!searchQuery) return true;
+        const partDetails = getPartDetails(entry.cbf_part_number);
+        const searchLower = searchQuery.toLowerCase();
+        return (
+            entry.cbf_part_number.toLowerCase().includes(searchLower) ||
+            (partDetails?.part_description?.toLowerCase() || '').includes(searchLower)
+        );
+    });
+
     if (loading) {
         return (
             <Card style={styles.loadingCard}>
@@ -146,13 +160,13 @@ export default function ProjectPartsViewer({
                 <View style={styles.modeHeader}>
                     <View style={styles.modeInfo}>
                         <MaterialCommunityIcons
-                            name={isEditMode ? 'pencil' : 'eye-outline'}
+                            name={editingRowIndex !== null ? 'pencil' : 'eye-outline'}
                             size={22}
                             color={colors.accent}
                         />
                         <View style={styles.modeTextContainer}>
                             <Text style={[styles.modeTitle, { color: colors.textPrimary }]}>
-                                {isEditMode ? 'Edit Mode' : 'View Mode'}
+                                {editingRowIndex !== null ? 'Edit Mode' : 'View Mode'}
                             </Text>
                             <Text style={[styles.modeSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
                                 {entries.length} part(s) loaded
@@ -166,22 +180,22 @@ export default function ProjectPartsViewer({
                             style={[
                                 styles.segmentButton,
                                 styles.segmentLeft,
-                                !isEditMode && styles.segmentActive,
-                                !isEditMode && { backgroundColor: colors.primary }
+                                editingRowIndex === null && styles.segmentActive,
+                                editingRowIndex === null && { backgroundColor: colors.primary }
                             ]}
-                            onPress={() => setIsEditMode(false)}
+                            onPress={() => setEditingRowIndex(null)}
                             activeOpacity={0.8}
                         >
                             <MaterialCommunityIcons
-                                name="eye-outline"
+                                name="format-list-bulleted"
                                 size={16}
-                                color={!isEditMode ? '#fff' : colors.textSecondary}
+                                color={editingRowIndex === null ? '#fff' : colors.textSecondary}
                             />
                             <Text style={[
                                 styles.segmentText,
-                                { color: !isEditMode ? '#fff' : colors.textSecondary }
+                                { color: editingRowIndex === null ? '#fff' : colors.textSecondary }
                             ]}>
-                                View
+                                View All
                             </Text>
                         </TouchableOpacity>
 
@@ -189,191 +203,225 @@ export default function ProjectPartsViewer({
                             style={[
                                 styles.segmentButton,
                                 styles.segmentRight,
-                                isEditMode && styles.segmentActive,
-                                isEditMode && { backgroundColor: COLORS.warning }
+                                editingRowIndex !== null && styles.segmentActive,
+                                editingRowIndex !== null && { backgroundColor: COLORS.warning }
                             ]}
-                            onPress={() => setIsEditMode(true)}
+                            onPress={() => {
+                                // Default logic: open the first one for edit if none is open
+                                if (editingRowIndex === null && filteredEntries.length > 0) {
+                                    setEditingRowIndex(filteredEntries[0].originalIndex);
+                                }
+                            }}
                             activeOpacity={0.8}
                         >
                             <MaterialCommunityIcons
                                 name="pencil"
                                 size={16}
-                                color={isEditMode ? '#fff' : colors.textSecondary}
+                                color={editingRowIndex !== null ? '#fff' : colors.textSecondary}
                             />
                             <Text style={[
                                 styles.segmentText,
-                                { color: isEditMode ? '#fff' : colors.textSecondary }
+                                { color: editingRowIndex !== null ? '#fff' : colors.textSecondary }
                             ]}>
-                                Edit
+                                Edit Row
                             </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+                    <Input
+                        placeholder="Search by Part No. or Description..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        style={{ flex: 1, marginBottom: 0 }}
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+                            <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
+                        </TouchableOpacity>
+                    )}
+                </View>
             </Card>
 
             {/* Parts List */}
-            {isEditMode ? (
-                // EDIT MODE - Editable entries
-                <View>
-                    {entries.map((entry, index) => {
-                        const partDetails = getPartDetails(entry.cbf_part_number);
-                        return (
-                            <Card key={index} style={styles.entryCard}>
-                                <View style={styles.entryHeader}>
-                                    <Text style={[styles.entryTitle, { color: colors.accent }]}>
-                                        Part {index + 1}
-                                    </Text>
-                                    {entries.length > 1 && (
-                                        <TouchableOpacity onPress={() => removeEntry(index)}>
-                                            <MaterialCommunityIcons
-                                                name="trash-can"
-                                                size={24}
-                                                color={colors.danger}
-                                            />
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-
-                                <SearchablePartSelector
-                                    parts={parts}
-                                    selectedPart={entry.cbf_part_number}
-                                    onSelectPart={(partNo) => updateEntry(index, 'cbf_part_number', partNo)}
-                                    label="CBF Part Number"
-                                    placeholder="Search by part number or description..."
-                                    showExternalScanner={true}
-                                />
-
-                                {transactionType === 'mto' ? (
-                                    <View style={styles.row}>
-                                        <View style={styles.halfInput}>
-                                            <Input
-                                                label="Required *"
-                                                placeholder="Req. Qty"
-                                                keyboardType="numeric"
-                                                value={entry.required_quantity ? String(entry.required_quantity) : ''}
-                                                onChangeText={(text) =>
-                                                    updateEntry(index, 'required_quantity', parseInt(text) || 0)
-                                                }
-                                            />
-                                        </View>
-                                        <View style={styles.halfInput}>
-                                            <Input
-                                                label="Pulled *"
-                                                placeholder="Pulled Qty"
-                                                keyboardType="numeric"
-                                                value={entry.pulled_quantity ? String(entry.pulled_quantity) : ''}
-                                                onChangeText={(text) =>
-                                                    updateEntry(index, 'pulled_quantity', parseInt(text) || 0)
-                                                }
-                                            />
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <Input
-                                        label="Quantity *"
-                                        placeholder="Enter quantity"
-                                        keyboardType="numeric"
-                                        value={entry.quantity ? String(entry.quantity) : ''}
-                                        onChangeText={(text) =>
-                                            updateEntry(index, 'quantity', parseInt(text) || 0)
-                                        }
-                                    />
-                                )}
-                            </Card>
-                        );
-                    })}
-
-                    <Button
-                        title="Add Another Part"
-                        variant="secondary"
-                        onPress={addEntry}
-                        icon={<MaterialCommunityIcons name="plus" size={20} color={colors.primary} />}
-                        style={styles.addButton}
+            {entries.length === 0 ? (
+                <Card style={styles.emptyCard}>
+                    <MaterialCommunityIcons
+                        name="package-variant"
+                        size={48}
+                        color={colors.border}
                     />
-                </View>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                        No parts in this project yet
+                    </Text>
+                    <Text style={[styles.emptySubtext, { color: colors.textLight }]}>
+                        Click 'Add Another Part' below to add parts
+                    </Text>
+                </Card>
             ) : (
-                // VIEW MODE - Read-only display
-                <View>
-                    {entries.length === 0 ? (
-                        <Card style={styles.emptyCard}>
-                            <MaterialCommunityIcons
-                                name="package-variant"
-                                size={48}
-                                color={colors.border}
-                            />
-                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                No parts in this project yet
-                            </Text>
-                            <Text style={[styles.emptySubtext, { color: colors.textLight }]}>
-                                Switch to Edit Mode to add parts
-                            </Text>
-                        </Card>
-                    ) : (
-                        entries.map((entry, index) => {
+                <ScrollView
+                    style={styles.tableScrollView}
+                    stickyHeaderIndices={[0]}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* Sticky Table Header */}
+                    <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                        <Text style={[styles.tableHeaderText, { flex: 2, color: colors.textSecondary }]}>CBF Part No.</Text>
+
+                        {transactionType === 'mto' ? (
+                            <>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Req.</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Pulled</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Rem.</Text>
+                            </>
+                        ) : transactionType === 'requisition' ? (
+                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Req. Qty</Text>
+                        ) : (
+                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Qty</Text>
+                        )}
+                    </View>
+
+                    <View>
+                        {filteredEntries.map(({ entry, originalIndex }) => {
+                            const isEditing = editingRowIndex === originalIndex;
                             const partDetails = getPartDetails(entry.cbf_part_number);
-                            return (
-                                <Card key={index} style={styles.viewCard}>
-                                    <View style={styles.viewHeader}>
-                                        <View style={styles.partNumberContainer}>
-                                            <Text style={[styles.partNumber, { color: colors.textPrimary }]}>
-                                                {entry.cbf_part_number}
-                                            </Text>
-                                            {partDetails && (
-                                                <Text
-                                                    style={[styles.partDesc, { color: colors.textSecondary }]}
-                                                    numberOfLines={1}
-                                                >
-                                                    {partDetails.part_description}
+
+                            if (isEditing) {
+                                // EDIT MODE CARD
+                                return (
+                                    <Card key={originalIndex} style={styles.entryCard}>
+                                        <View style={styles.entryHeader}>
+                                            <TouchableOpacity
+                                                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                                                onPress={() => setEditingRowIndex(null)}
+                                            >
+                                                <MaterialCommunityIcons name="chevron-up" size={24} color={colors.accent} />
+                                                <Text style={[styles.entryTitle, { color: colors.accent }]}>
+                                                    Editing Row {originalIndex + 1}
                                                 </Text>
+                                            </TouchableOpacity>
+
+                                            {entries.length > 1 && (
+                                                <TouchableOpacity onPress={() => removeEntry(originalIndex)}>
+                                                    <MaterialCommunityIcons
+                                                        name="trash-can"
+                                                        size={24}
+                                                        color={colors.danger}
+                                                    />
+                                                </TouchableOpacity>
                                             )}
                                         </View>
+
+                                        <SearchablePartSelector
+                                            parts={parts}
+                                            selectedPart={entry.cbf_part_number}
+                                            onSelectPart={(partNo) => updateEntry(originalIndex, 'cbf_part_number', partNo)}
+                                            label="CBF Part Number"
+                                            placeholder="Search by part number or description..."
+                                            showExternalScanner={true}
+                                        />
+
+                                        {transactionType === 'mto' ? (
+                                            <View style={styles.row}>
+                                                <View style={styles.halfInput}>
+                                                    <Input
+                                                        label="Required *"
+                                                        placeholder="Req. Qty"
+                                                        keyboardType="numeric"
+                                                        value={entry.required_quantity ? String(entry.required_quantity) : ''}
+                                                        onChangeText={(text) =>
+                                                            updateEntry(originalIndex, 'required_quantity', parseInt(text) || 0)
+                                                        }
+                                                    />
+                                                </View>
+                                                <View style={styles.halfInput}>
+                                                    <Input
+                                                        label="Pulled *"
+                                                        placeholder="Pulled Qty"
+                                                        keyboardType="numeric"
+                                                        value={entry.pulled_quantity ? String(entry.pulled_quantity) : ''}
+                                                        onChangeText={(text) =>
+                                                            updateEntry(originalIndex, 'pulled_quantity', parseInt(text) || 0)
+                                                        }
+                                                    />
+                                                </View>
+                                            </View>
+                                        ) : (
+                                            <Input
+                                                label="Quantity *"
+                                                placeholder="Enter quantity"
+                                                keyboardType="numeric"
+                                                value={entry.quantity !== undefined ? String(entry.quantity) : ''}
+                                                onChangeText={(text) =>
+                                                    updateEntry(originalIndex, 'quantity', parseInt(text) || 0)
+                                                }
+                                            />
+                                        )}
+                                        <Button
+                                            title="Done Editing"
+                                            onPress={() => setEditingRowIndex(null)}
+                                            style={{ marginTop: SPACING.md }}
+                                            variant="secondary"
+                                        />
+                                    </Card>
+                                );
+                            }
+
+                            // VIEW MODE ROW
+                            return (
+                                <TouchableOpacity
+                                    key={originalIndex}
+                                    style={[styles.tableRow, { borderBottomColor: colors.border }]}
+                                    onPress={() => setEditingRowIndex(originalIndex)}
+                                >
+                                    <View style={{ flex: 2, paddingRight: SPACING.sm }}>
+                                        <Text style={[styles.partNumberText, { color: colors.textPrimary }]} numberOfLines={1}>
+                                            {entry.cbf_part_number || '<Empty>'}
+                                        </Text>
+                                        {partDetails && (
+                                            <Text style={[styles.partDescText, { color: colors.textSecondary }]} numberOfLines={1}>
+                                                {partDetails.part_description}
+                                            </Text>
+                                        )}
                                     </View>
 
                                     {transactionType === 'mto' ? (
-                                        <View style={styles.viewQuantities}>
-                                            <View style={styles.qtyItem}>
-                                                <Text style={[styles.qtyLabel, { color: colors.textSecondary }]}>
-                                                    Required
-                                                </Text>
-                                                <Text style={[styles.qtyValue, { color: colors.textPrimary }]}>
-                                                    {entry.required_quantity || 0}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.qtyItem}>
-                                                <Text style={[styles.qtyLabel, { color: colors.textSecondary }]}>
-                                                    Pulled
-                                                </Text>
-                                                <Text style={[styles.qtyValue, { color: colors.textPrimary }]}>
-                                                    {entry.pulled_quantity || 0}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.qtyItem}>
-                                                <Text style={[styles.qtyLabel, { color: colors.textSecondary }]}>
-                                                    Remaining
-                                                </Text>
-                                                <Text style={[styles.qtyValue, { color: COLORS.warning }]}>
-                                                    {(entry.required_quantity || 0) - (entry.pulled_quantity || 0)}
-                                                </Text>
-                                            </View>
-                                        </View>
+                                        <>
+                                            <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>
+                                                {entry.required_quantity || 0}
+                                            </Text>
+                                            <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>
+                                                {entry.pulled_quantity || 0}
+                                            </Text>
+                                            <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: COLORS.warning, fontWeight: '700' }]}>
+                                                {(entry.required_quantity || 0) - (entry.pulled_quantity || 0)}
+                                            </Text>
+                                        </>
                                     ) : (
-                                        <View style={styles.viewQuantities}>
-                                            <View style={styles.qtyItem}>
-                                                <Text style={[styles.qtyLabel, { color: colors.textSecondary }]}>
-                                                    Quantity
-                                                </Text>
-                                                <Text style={[styles.qtyValue, { color: colors.textPrimary }]}>
-                                                    {entry.quantity || 0}
-                                                </Text>
-                                            </View>
-                                        </View>
+                                        <Text style={[styles.cellText, { flex: 1, textAlign: 'right', color: colors.textPrimary }]}>
+                                            {entry.quantity || 0}
+                                        </Text>
                                     )}
-                                </Card>
+                                </TouchableOpacity>
                             );
-                        })
-                    )}
-                </View>
+                        })}
+                    </View>
+                </ScrollView>
             )}
+
+            <Button
+                title="Add Another Part"
+                variant="secondary"
+                onPress={() => {
+                    addEntry();
+                    setEditingRowIndex(entries.length); // auto-open new row for editing
+                }}
+                icon={<MaterialCommunityIcons name="plus" size={20} color={colors.primary} />}
+                style={styles.addButton}
+            />
         </View>
     );
 }
@@ -475,44 +523,63 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     addButton: {
+        marginTop: SPACING.md,
         marginBottom: SPACING.md,
     },
-    viewCard: {
-        marginBottom: SPACING.md,
-        borderLeftWidth: 4,
-        borderLeftColor: COLORS.success,
-    },
-    viewHeader: {
-        marginBottom: SPACING.sm,
-    },
-    partNumberContainer: {
-        flex: 1,
-    },
-    partNumber: {
-        fontSize: 16,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    partDesc: {
-        fontSize: 14,
-    },
-    viewQuantities: {
+    searchContainer: {
         flexDirection: 'row',
-        gap: SPACING.lg,
-        paddingTop: SPACING.sm,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        alignItems: 'center',
+        marginTop: SPACING.md,
+        gap: SPACING.sm,
     },
-    qtyItem: {
-        flex: 1,
+    searchIcon: {
+        marginRight: -SPACING.md,
+        zIndex: 1,
+        paddingLeft: SPACING.sm,
     },
-    qtyLabel: {
+    clearSearchBtn: {
+        position: 'absolute',
+        right: SPACING.sm,
+        padding: SPACING.xs,
+    },
+    tableScrollView: {
+        maxHeight: 450,
+        backgroundColor: COLORS.card,
+        borderRadius: BORDER_RADIUS.md,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        borderBottomWidth: 1,
+        alignItems: 'center',
+    },
+    tableHeaderText: {
         fontSize: 12,
-        marginBottom: 4,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
     },
-    qtyValue: {
-        fontSize: 18,
+    tableRow: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.md,
+        borderBottomWidth: 1,
+        alignItems: 'center',
+    },
+    partNumberText: {
+        fontSize: 14,
         fontWeight: '700',
+    },
+    partDescText: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    cellText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     emptyCard: {
         alignItems: 'center',

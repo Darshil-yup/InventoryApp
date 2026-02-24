@@ -65,6 +65,8 @@ export default function InventoryScreen() {
     const [locationScanEntryIndex, setLocationScanEntryIndex] = useState<number | null>(null);
     // Ref ensures the latest index is always available inside the scan callback (no stale closure)
     const locationScanEntryIndexRef = useRef<number | null>(null);
+    const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+    const [entrySearchQuery, setEntrySearchQuery] = useState('');
 
     useEffect(() => {
         loadUserAndData();
@@ -168,227 +170,291 @@ export default function InventoryScreen() {
     }
 
     return (
-        <>
-            <View style={{ flex: 1, backgroundColor: colors.background }}>
-                <SafeAreaView style={styles.container}>
-                    <AppHeader showBackButton />
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <SafeAreaView style={styles.container}>
+                <AppHeader showBackButton />
 
-                    <ScrollView style={styles.content}>
-                        <View style={styles.infoRow}>
-                            <Card style={styles.infoCard}>
-                                <MaterialCommunityIcons name="warehouse" size={24} color={colors.accent} />
-                                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>Inventory</Text>
-                                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Type</Text>
-                            </Card>
-                            <Card style={styles.infoCard}>
-                                <MaterialCommunityIcons name="account" size={24} color={colors.accent} />
-                                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.name?.split(' ')[0]}</Text>
-                                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Employee</Text>
-                            </Card>
+                <ScrollView style={styles.content}>
+                    <View style={styles.infoRow}>
+                        <Card style={styles.infoCard}>
+                            <MaterialCommunityIcons name="warehouse" size={24} color={colors.accent} />
+                            <Text style={[styles.infoValue, { color: colors.textPrimary }]}>Inventory</Text>
+                            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Type</Text>
+                        </Card>
+                        <Card style={styles.infoCard}>
+                            <MaterialCommunityIcons name="account" size={24} color={colors.accent} />
+                            <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.name?.split(' ')[0]}</Text>
+                            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Employee</Text>
+                        </Card>
+                    </View>
+
+                    {/* View Past Inventory Section */}
+                    <Card style={styles.viewSection}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialCommunityIcons name="history" size={20} color={colors.accent} />
+                            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+                                View Past Inventory
+                            </Text>
                         </View>
 
-                        {/* View Past Inventory Section */}
-                        <Card style={styles.viewSection}>
-                            <View style={styles.sectionHeader}>
-                                <MaterialCommunityIcons name="history" size={20} color={colors.accent} />
-                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-                                    View Past Inventory
-                                </Text>
-                            </View>
+                        {availableDates.length === 0 ? (
+                            <Text style={[styles.label, { color: colors.textSecondary, textAlign: 'center', paddingVertical: 12 }]}>
+                                No inventory records found yet.{'\n'}Submit your first entry below.
+                            </Text>
+                        ) : (
+                            <>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs }}>
+                                    <Text style={[styles.label, { color: colors.textSecondary, marginBottom: 0 }]}>Select Date</Text>
 
-                            {availableDates.length === 0 ? (
-                                <Text style={[styles.label, { color: colors.textSecondary, textAlign: 'center', paddingVertical: 12 }]}>
-                                    No inventory records found yet.{'\n'}Submit your first entry below.
-                                </Text>
-                            ) : (
-                                <>
-                                    <Text style={[styles.label, { color: colors.textSecondary }]}>Select Date</Text>
                                     <TouchableOpacity
-                                        style={[styles.dateDropdown, { borderColor: colors.border }]}
-                                        onPress={() => setShowDateDropdown(!showDateDropdown)}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BORDER_RADIUS.sm }}
+                                        onPress={() => setShowDatePicker(true)}
                                     >
-                                        <Text style={[styles.dateDropdownText, { color: selectedViewDate ? colors.textPrimary : colors.textLight }]}>
-                                            {selectedViewDate || 'Select a date...'}
-                                        </Text>
-                                        <MaterialCommunityIcons
-                                            name={showDateDropdown ? "chevron-up" : "chevron-down"}
-                                            size={24}
-                                            color={colors.textSecondary}
-                                        />
+                                        <MaterialCommunityIcons name="plus" size={16} color={colors.primary} />
+                                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>New Entry</Text>
                                     </TouchableOpacity>
-
-                                    {showDateDropdown && (
-                                        <ScrollView
-                                            style={[styles.dateList, { backgroundColor: colors.card, borderColor: colors.border }]}
-                                            nestedScrollEnabled={true}
-                                            keyboardShouldPersistTaps="handled"
-                                        >
-                                            {availableDates.map((date, index) => (
-                                                <TouchableOpacity
-                                                    key={index}
-                                                    style={[
-                                                        styles.dateItem,
-                                                        selectedViewDate === date && styles.dateItemSelected,
-                                                        selectedViewDate === date && { backgroundColor: colors.primaryLight }
-                                                    ]}
-                                                    onPress={() => {
-                                                        setSelectedViewDate(date);
-                                                        setShowDateDropdown(false);
-                                                    }}
-                                                >
-                                                    <MaterialCommunityIcons
-                                                        name="calendar-check"
-                                                        size={16}
-                                                        color={selectedViewDate === date ? colors.primary : colors.textSecondary}
-                                                    />
-                                                    <Text style={[
-                                                        styles.dateItemText,
-                                                        { color: selectedViewDate === date ? colors.primary : colors.textPrimary }
-                                                    ]}>
-                                                        {date}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    )}
-                                </>
-                            )}
-                        </Card>
-
-                        {/* InventoryDateViewer Component */}
-                        {selectedViewDate && (
-                            <InventoryDateViewer
-                                selectedDate={selectedViewDate}
-                                parts={parts}
-                            />
-                        )}
-
-                        {/* Divider */}
-                        {selectedViewDate && (
-                            <View style={styles.divider}>
-                                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                                <Text style={[styles.dividerText, { color: colors.textSecondary }]}>OR</Text>
-                                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                            </View>
-                        )}
-
-                        {/* Add New Inventory Today Section */}
-                        <Card>
-                            <View style={styles.sectionHeader}>
-                                <MaterialCommunityIcons name="plus-circle" size={20} color={COLORS.success} />
-                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-                                    Add New Inventory
-                                </Text>
-                            </View>
-
-                            <Text style={styles.label}>Recording Date</Text>
-                            <TouchableOpacity
-                                style={styles.dateButton}
-                                onPress={() => setShowDatePicker(true)}
-                            >
-                                <Text style={styles.dateText}>{formatDate(recordingDate)}</Text>
-                                <MaterialCommunityIcons name="calendar" size={24} color={colors.primary} />
-                            </TouchableOpacity>
-
-                            {showDatePicker && (
-                                <DateTimePicker
-                                    value={recordingDate}
-                                    mode="date"
-                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                    onChange={onDateChange}
-                                />
-                            )}
-                        </Card>
-
-                        {entries.map((entry, index) => (
-                            <Card key={index} style={styles.entryCard}>
-                                <View style={styles.entryHeader}>
-                                    <Text style={[styles.entryTitle, { color: colors.accent }]}>Entry {index + 1}</Text>
-                                    {entries.length > 1 && (
-                                        <TouchableOpacity onPress={() => removeEntry(index)}>
-                                            <MaterialCommunityIcons name="trash-can" size={24} color={colors.danger} />
-                                        </TouchableOpacity>
-                                    )}
                                 </View>
 
-                                <SearchablePartSelector
-                                    parts={parts}
-                                    selectedPart={entry.cbf_part_number}
-                                    onSelectPart={(partNo) => updateEntry(index, 'cbf_part_number', partNo)}
-                                    label="CBF Part Number"
-                                    showExternalScanner={true}
-                                />
-
-                                {/* Single QR scan fills Rack, Level & Bin at once */}
                                 <TouchableOpacity
-                                    style={[styles.scanLocationBtn, { borderColor: colors.primary }]}
-                                    onPress={() => {
-                                        locationScanEntryIndexRef.current = index;
-                                        setLocationScanEntryIndex(index);
-                                        setLocationScannerVisible(true);
-                                    }}
+                                    style={[styles.dateDropdown, { borderColor: colors.border }]}
+                                    onPress={() => setShowDateDropdown(!showDateDropdown)}
                                 >
-                                    <MaterialCommunityIcons name="qrcode-scan" size={18} color={colors.primary} />
-                                    <Text style={[styles.scanLocationText, { color: colors.primary }]}>Scan Location (Rack–Level–Bin)</Text>
+                                    <Text style={[styles.dateDropdownText, { color: selectedViewDate ? colors.textPrimary : colors.textLight }]}>
+                                        {selectedViewDate || 'Select a date...'}
+                                    </Text>
+                                    <MaterialCommunityIcons
+                                        name={showDateDropdown ? "chevron-up" : "chevron-down"}
+                                        size={24}
+                                        color={colors.textSecondary}
+                                    />
                                 </TouchableOpacity>
 
-                                <View style={styles.row}>
-                                    <View style={styles.thirdInput}>
-                                        <Input
-                                            label="Rack *"
-                                            placeholder="X"
-                                            value={entry.rack}
-                                            onChangeText={(text) => updateEntry(index, 'rack', text)}
-                                        />
-                                    </View>
-                                    <View style={styles.thirdInput}>
-                                        <Input
-                                            label="Level *"
-                                            placeholder="1"
-                                            value={entry.level}
-                                            onChangeText={(text) => updateEntry(index, 'level', text)}
-                                        />
-                                    </View>
-                                    <View style={styles.thirdInput}>
-                                        <Input
-                                            label="Bin *"
-                                            placeholder="A"
-                                            value={entry.bin}
-                                            onChangeText={(text) => updateEntry(index, 'bin', text)}
-                                        />
-                                    </View>
+                                {showDateDropdown && (
+                                    <ScrollView
+                                        style={[styles.dateList, { backgroundColor: colors.card, borderColor: colors.border }]}
+                                        nestedScrollEnabled={true}
+                                        keyboardShouldPersistTaps="handled"
+                                    >
+                                        {availableDates.map((date, index) => (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[
+                                                    styles.dateItem,
+                                                    selectedViewDate === date && styles.dateItemSelected,
+                                                    selectedViewDate === date && { backgroundColor: colors.primaryLight }
+                                                ]}
+                                                onPress={() => {
+                                                    setSelectedViewDate(date);
+                                                    setShowDateDropdown(false);
+                                                }}
+                                            >
+                                                <MaterialCommunityIcons
+                                                    name="calendar-check"
+                                                    size={16}
+                                                    color={selectedViewDate === date ? colors.primary : colors.textSecondary}
+                                                />
+                                                <Text style={[
+                                                    styles.dateItemText,
+                                                    { color: selectedViewDate === date ? colors.primary : colors.textPrimary }
+                                                ]}>
+                                                    {date}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                )}
+                            </>
+                        )}
+                    </Card>
+
+                    {showDatePicker && (
+                        <DateTimePicker
+                            value={recordingDate}
+                            mode="date"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                            onChange={onDateChange}
+                        />
+                    )}
+
+                    {/* InventoryDateViewer Component */}
+                    {selectedViewDate && !showDatePicker && (
+                        <InventoryDateViewer
+                            selectedDate={selectedViewDate}
+                            parts={parts}
+                        />
+                    )}
+
+                    {/* Add New Inventory Mode (Active when no historical date is selected) */}
+                    {!selectedViewDate && !showDatePicker && (
+                        <Card>
+                            {/* Search bar */}
+                            <View style={styles.searchContainer}>
+                                <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+                                <Input
+                                    placeholder="Search by Part No. or Description..."
+                                    value={entrySearchQuery}
+                                    onChangeText={setEntrySearchQuery}
+                                    style={{ flex: 1, marginBottom: 0 }}
+                                />
+                                {entrySearchQuery.length > 0 && (
+                                    <TouchableOpacity onPress={() => setEntrySearchQuery('')} style={styles.clearSearchBtn}>
+                                        <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {/* Sticky-header table */}
+                            <ScrollView
+                                style={[styles.tableScrollView, { borderColor: colors.border }]}
+                                stickyHeaderIndices={[0]}
+                                showsVerticalScrollIndicator={false}
+                                nestedScrollEnabled={true}
+                            >
+                                {/* Header row */}
+                                <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                                    <Text style={[styles.tableHeaderText, { flex: 2, color: colors.textSecondary }]}>CBF Part No.</Text>
+                                    <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Rack</Text>
+                                    <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Level</Text>
+                                    <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Bin</Text>
+                                    <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Qty</Text>
                                 </View>
 
-                                <Input
-                                    label="Quantity *"
-                                    placeholder="Counted Qty"
-                                    keyboardType="numeric"
-                                    value={entry.quantity ? String(entry.quantity) : ''}
-                                    onChangeText={(text) => updateEntry(index, 'quantity', parseInt(text) || 0)}
-                                />
-                            </Card>
-                        ))}
+                                <View>
+                                    {entries
+                                        .map((entry, index) => ({ entry, originalIndex: index }))
+                                        .filter(({ entry }) => {
+                                            if (!entrySearchQuery) return true;
+                                            const partDetails = parts.find(p => p.cbf_part_no === entry.cbf_part_number);
+                                            const q = entrySearchQuery.toLowerCase();
+                                            return (
+                                                entry.cbf_part_number.toLowerCase().includes(q) ||
+                                                (partDetails?.part_description?.toLowerCase() || '').includes(q)
+                                            );
+                                        })
+                                        .map(({ entry, originalIndex }) => {
+                                            const isEditing = editingRowIndex === originalIndex;
+                                            const partDetails = parts.find(p => p.cbf_part_no === entry.cbf_part_number);
 
-                        <Button
-                            title="Add Another Entry"
-                            variant="secondary"
-                            onPress={addEntry}
-                            icon={<MaterialCommunityIcons name="plus" size={20} color={colors.primary} />}
-                            style={styles.addButton}
-                        />
+                                            if (isEditing) {
+                                                return (
+                                                    <View key={originalIndex} style={[styles.editCard, { backgroundColor: colors.card }]}>
+                                                        <View style={styles.entryHeader}>
+                                                            <TouchableOpacity
+                                                                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                                                                onPress={() => setEditingRowIndex(null)}
+                                                            >
+                                                                <MaterialCommunityIcons name="chevron-up" size={24} color={colors.textSecondary} />
+                                                                <Text style={[styles.entryTitle, { color: colors.textSecondary, fontSize: 14 }]}>
+                                                                    Editing Entry #{originalIndex + 1}
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                            {entries.length > 1 && (
+                                                                <TouchableOpacity onPress={() => { removeEntry(originalIndex); setEditingRowIndex(null); }}>
+                                                                    <MaterialCommunityIcons name="trash-can" size={22} color={colors.danger} />
+                                                                </TouchableOpacity>
+                                                            )}
+                                                        </View>
 
-                        <Button
-                            title="Submit Inventory"
-                            onPress={handleSubmit}
-                            loading={loading}
-                            style={styles.submitButton}
-                            icon={<MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
-                        />
+                                                        <SearchablePartSelector
+                                                            parts={parts}
+                                                            selectedPart={entry.cbf_part_number}
+                                                            onSelectPart={(partNo) => updateEntry(originalIndex, 'cbf_part_number', partNo)}
+                                                            label="CBF Part Number"
+                                                            showExternalScanner={true}
+                                                        />
 
-                        <View style={{ height: 40 }} />
-                    </ScrollView>
-                </SafeAreaView>
-            </View>
+                                                        <TouchableOpacity
+                                                            style={[styles.scanLocationBtn, { borderColor: colors.primary }]}
+                                                            onPress={() => {
+                                                                locationScanEntryIndexRef.current = originalIndex;
+                                                                setLocationScanEntryIndex(originalIndex);
+                                                                setLocationScannerVisible(true);
+                                                            }}
+                                                        >
+                                                            <MaterialCommunityIcons name="qrcode-scan" size={18} color={colors.primary} />
+                                                            <Text style={[styles.scanLocationText, { color: colors.primary }]}>Scan Location (Rack–Level–Bin)</Text>
+                                                        </TouchableOpacity>
+
+                                                        <View style={styles.row}>
+                                                            <View style={styles.thirdInput}>
+                                                                <Input label="Rack *" placeholder="X" value={entry.rack} onChangeText={(t) => updateEntry(originalIndex, 'rack', t)} />
+                                                            </View>
+                                                            <View style={styles.thirdInput}>
+                                                                <Input label="Level *" placeholder="1" value={entry.level} onChangeText={(t) => updateEntry(originalIndex, 'level', t)} />
+                                                            </View>
+                                                            <View style={styles.thirdInput}>
+                                                                <Input label="Bin *" placeholder="A" value={entry.bin} onChangeText={(t) => updateEntry(originalIndex, 'bin', t)} />
+                                                            </View>
+                                                        </View>
+
+                                                        <Input
+                                                            label="Quantity *"
+                                                            placeholder="Counted Qty"
+                                                            keyboardType="numeric"
+                                                            value={entry.quantity ? String(entry.quantity) : ''}
+                                                            onChangeText={(t) => updateEntry(originalIndex, 'quantity', parseInt(t) || 0)}
+                                                        />
+
+                                                        <Button
+                                                            title="Done Editing"
+                                                            onPress={() => setEditingRowIndex(null)}
+                                                            style={{ marginTop: SPACING.sm }}
+                                                            variant="secondary"
+                                                        />
+                                                    </View>
+                                                );
+                                            }
+
+                                            // View row
+                                            return (
+                                                <TouchableOpacity
+                                                    key={originalIndex}
+                                                    style={[styles.tableRow, { borderBottomColor: colors.border }]}
+                                                    onPress={() => setEditingRowIndex(originalIndex)}
+                                                >
+                                                    <View style={{ flex: 2, paddingRight: SPACING.sm }}>
+                                                        <Text style={[styles.partNumberText, { color: colors.textPrimary }]} numberOfLines={1}>
+                                                            {entry.cbf_part_number || '<Empty>'}
+                                                        </Text>
+                                                        {partDetails && (
+                                                            <Text style={[styles.partDescText, { color: colors.textSecondary }]} numberOfLines={1}>
+                                                                {partDetails.part_description}
+                                                            </Text>
+                                                        )}
+                                                    </View>
+                                                    <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>{entry.rack || '-'}</Text>
+                                                    <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>{entry.level || '-'}</Text>
+                                                    <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>{entry.bin || '-'}</Text>
+                                                    <Text style={[styles.cellText, { flex: 1, textAlign: 'right', color: colors.textPrimary }]}>{entry.quantity || 0}</Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })
+                                    }
+                                </View>
+                            </ScrollView>
+
+                            <Button
+                                title="Add Another Entry"
+                                variant="secondary"
+                                onPress={() => { addEntry(); setEditingRowIndex(entries.length); }}
+                                icon={<MaterialCommunityIcons name="plus" size={20} color={colors.primary} />}
+                                style={styles.addButton}
+                            />
+                        </Card>
+                    )}
+
+                    <Button
+                        title="Submit Inventory"
+                        onPress={handleSubmit}
+                        loading={loading}
+                        style={styles.submitButton}
+                        icon={<MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+                    />
+
+                    <View style={{ height: 40 }} />
+                </ScrollView>
+            </SafeAreaView>
+
             <QRScanner
                 visible={locationScannerVisible}
                 onClose={() => { setLocationScannerVisible(false); setLocationScanEntryIndex(null); locationScanEntryIndexRef.current = null; }}
@@ -414,7 +480,7 @@ export default function InventoryScreen() {
                 }}
                 title="Scan Location QR (Rack–Level–Bin)"
             />
-        </>
+        </View >
     );
 }
 
@@ -573,10 +639,72 @@ const styles = StyleSheet.create({
         borderStyle: 'dashed',
         paddingVertical: 10,
         marginBottom: 8,
+        marginTop: 8,
     },
     scanLocationText: {
         fontSize: 13,
         fontWeight: '600',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: SPACING.md,
+        gap: SPACING.sm,
+    },
+    searchIcon: {
+        marginLeft: SPACING.sm,
+        marginRight: -35, // Adjust this so the icon sits inside the input field padding
+        zIndex: 1,
+    },
+    clearSearchBtn: {
+        position: 'absolute',
+        right: SPACING.sm,
+        padding: SPACING.xs,
+    },
+    tableScrollView: {
+        maxHeight: 400,
+        borderRadius: BORDER_RADIUS.md,
+        overflow: 'hidden',
+        borderWidth: 1,
+        marginTop: SPACING.sm,
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        borderBottomWidth: 1,
+        alignItems: 'center',
+    },
+    tableHeaderText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    tableRow: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.md,
+        borderBottomWidth: 1,
+        alignItems: 'center',
+    },
+    partNumberText: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    partDescText: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    cellText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    editCard: {
+        padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.md,
+        marginBottom: SPACING.sm,
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.info,
     },
 });
 
