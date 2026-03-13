@@ -317,14 +317,12 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts, em
                         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                             No inventory recorded for this date
                         </Text>
-                        {editingRowIndex !== null && (
-                            <Button
-                                title="Add First Item"
-                                onPress={() => { addItem(); setEditingRowIndex(0); }}
-                                style={styles.addButton}
-                                icon={<MaterialCommunityIcons name="plus" size={20} color={isDark ? colors.textPrimary : colors.primary} />}
-                            />
-                        )}
+                        <Button
+                            title="Add First Item"
+                            onPress={() => { addItem(); setEditingRowIndex(0); }}
+                            style={styles.addButton}
+                            icon={<MaterialCommunityIcons name="plus" size={20} color={isDark ? colors.textPrimary : colors.primary} />}
+                        />
                     </View>
                 ) : (
                     <View style={[styles.tableWrapper, { borderColor: colors.border }]}>
