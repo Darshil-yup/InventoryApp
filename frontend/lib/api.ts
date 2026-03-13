@@ -13,10 +13,7 @@ const apiClient = axios.create({
     },
 });
 
-// Use XMLHttpRequest adapter explicitly (works in React Native)
-if (axios.defaults.adapter) {
-    apiClient.defaults.adapter = axios.defaults.adapter;
-}
+// Removed problematic adapter override that causes Metro "prototype" errors
 
 export default apiClient;
 export { API_BASE_URL };

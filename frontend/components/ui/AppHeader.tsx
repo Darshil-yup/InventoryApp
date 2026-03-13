@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, Platform, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getThemeColors, SPACING, BORDER_RADIUS } from '../../constants/theme';
@@ -51,6 +51,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.md,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) + SPACING.sm : SPACING.md,
         borderBottomWidth: 1,
     },
     backButton: {

@@ -23,6 +23,7 @@ import Input from '../../components/ui/Input';
 import AppHeader from '../../components/ui/AppHeader';
 import ProjectPartsViewer from '../../components/ProjectPartsViewer';
 import { useMasterData } from '../../contexts/MasterDataContext';
+import SuccessModal from '../../components/ui/SuccessModal';
 
 interface Part {
     cbf_part_no: string;
@@ -53,6 +54,7 @@ export default function RequisitionScreen() {
     ]);
     const [loading, setLoading] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
+    const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number }>({ visible: false, count: 0 });
 
     useEffect(() => {
         loadUserAndData();
@@ -108,9 +110,7 @@ export default function RequisitionScreen() {
                 entries: validEntries,
             });
 
-            Alert.alert('Success', `${validEntries.length} part(s) requisitioned successfully`, [
-                { text: 'OK', onPress: () => router.back() },
-            ]);
+            setSuccessModal({ visible: true, count: validEntries.length });
         } catch (error: any) {
             console.error('Error submitting requisition:', error);
             Alert.alert('Error', 'Failed to submit requisition');
@@ -133,6 +133,16 @@ export default function RequisitionScreen() {
                 <AppHeader showBackButton />
 
                 <ScrollView style={styles.content}>
+                    <SuccessModal
+                        visible={successModal.visible}
+                        title="Requisition Submitted!"
+                        message="Parts have been successfully requisitioned for this project."
+                        detail={`${successModal.count} part(s) issued`}
+                        color="#ef4444"
+                        icon="file-document-check"
+                        onClose={() => { setSuccessModal({ visible: false, count: 0 }); router.back(); }}
+                        confirmLabel="Done"
+                    />
                     <View style={styles.infoRow}>
                         <Card style={styles.infoCard}>
                             <MaterialCommunityIcons name="file-document-edit" size={24} color={colors.accent} />
@@ -205,7 +215,6 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#ffffff',
     },
     infoValue: {
         fontSize: 16,

@@ -23,6 +23,7 @@ import Input from '../../components/ui/Input';
 import AppHeader from '../../components/ui/AppHeader';
 import ProjectPartsViewer from '../../components/ProjectPartsViewer';
 import { useMasterData } from '../../contexts/MasterDataContext';
+import SuccessModal from '../../components/ui/SuccessModal';
 
 
 interface Part {
@@ -55,6 +56,7 @@ export default function MTOScreen() {
     ]);
     const [loading, setLoading] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
+    const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number }>({ visible: false, count: 0 });
 
     useEffect(() => {
         loadUserAndData();
@@ -124,9 +126,7 @@ export default function MTOScreen() {
                 entries: validEntries,
             });
 
-            Alert.alert('Success', `${validEntries.length} part(s) recorded successfully`, [
-                { text: 'OK', onPress: () => router.back() },
-            ]);
+            setSuccessModal({ visible: true, count: validEntries.length });
         } catch (error: any) {
             console.error('Error submitting MTO:', error);
             Alert.alert('Error', 'Failed to submit MTO record');
@@ -149,6 +149,15 @@ export default function MTOScreen() {
                 <AppHeader showBackButton />
 
                 <ScrollView style={styles.content}>
+                    {/* Success Modal */}
+                    <SuccessModal
+                        visible={successModal.visible}
+                        title="MTO Submitted!"
+                        message="Material Transfer Out has been recorded successfully."
+                        detail={`${successModal.count} part(s) logged`}
+                        onClose={() => { setSuccessModal({ visible: false, count: 0 }); router.back(); }}
+                        confirmLabel="Done"
+                    />
                     <View style={styles.infoRow}>
                         <Card style={styles.infoCard}>
                             <MaterialCommunityIcons name="clipboard-check" size={24} color={colors.accent} />
@@ -223,7 +232,6 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: COLORS.card,
     },
     infoValue: {
         fontSize: 16,

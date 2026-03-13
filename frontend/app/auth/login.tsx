@@ -8,6 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import storage from '../../utils/storage';
@@ -24,6 +25,7 @@ export default function LoginScreen() {
     const [selectedEmployee, setSelectedEmployee] = useState('');
     const [pin, setPin] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPin, setShowPin] = useState(false);
 
     useEffect(() => {
         checkExistingLogin();
@@ -117,13 +119,25 @@ export default function LoginScreen() {
                             <Input
                                 label="PIN"
                                 placeholder="Enter 4-digit PIN"
-                                secureTextEntry
+                                secureTextEntry={!showPin}
                                 keyboardType="numeric"
                                 maxLength={4}
                                 value={pin}
                                 onChangeText={setPin}
                                 editable={!loading}
                                 placeholderTextColor={COLORS.textLight}
+                                rightElement={
+                                    <TouchableOpacity
+                                        onPress={() => setShowPin(!showPin)}
+                                        style={{ paddingHorizontal: SPACING.sm }}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name={showPin ? 'eye-off' : 'eye'}
+                                            size={22}
+                                            color={COLORS.textLight}
+                                        />
+                                    </TouchableOpacity>
+                                }
                             />
 
                             <Button

@@ -39,13 +39,13 @@ export default function Button({
     };
 
     const getTextColor = () => {
-        if (variant === 'outline') return colors.primary;
+        if (variant === 'outline') return isDark ? colors.textPrimary : colors.primary;
         if (variant === 'primary') return colors.primary; // Dark text on gold button
         return colors.textInverse;
     };
 
     const getBorderColor = () => {
-        if (variant === 'outline') return colors.primary;
+        if (variant === 'outline') return isDark ? colors.border : colors.primary;
         return 'transparent';
     };
 

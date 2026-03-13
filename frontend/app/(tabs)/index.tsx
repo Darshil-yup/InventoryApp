@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import storage from '../../utils/storage';
+import apiClient from '../../lib/api';
 import { getThemeColors, SPACING, BORDER_RADIUS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -21,9 +22,11 @@ export default function HomeScreen() {
     const { isDark, toggleTheme } = useTheme();
     const colors = getThemeColors(isDark);
     const [userName, setUserName] = useState('');
+    const [todayCounts, setTodayCounts] = useState<Record<string, number>>({});
 
     useEffect(() => {
         loadUser();
+        loadTodayCounts();
     }, []);
 
     const loadUser = async () => {
@@ -35,6 +38,25 @@ export default function HomeScreen() {
             }
         } catch (error) {
             console.error('Error loading user:', error);
+        }
+    };
+
+    const loadTodayCounts = async () => {
+        try {
+            const [receiving, inventory, mto, requisition] = await Promise.allSettled([
+                apiClient.get('/api/receiving/today-count'),
+                apiClient.get('/api/inventory/today-count'),
+                apiClient.get('/api/mto/today-count'),
+                apiClient.get('/api/requisition/today-count'),
+            ]);
+            setTodayCounts({
+                receiving: receiving.status === 'fulfilled' ? (receiving.value.data.count ?? 0) : 0,
+                inventory: inventory.status === 'fulfilled' ? (inventory.value.data.count ?? 0) : 0,
+                mto: mto.status === 'fulfilled' ? (mto.value.data.count ?? 0) : 0,
+                requisition: requisition.status === 'fulfilled' ? (requisition.value.data.count ?? 0) : 0,
+            });
+        } catch {
+            // Counts are optional — silently ignore
         }
     };
 
@@ -92,7 +114,7 @@ export default function HomeScreen() {
     ];
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0 }]}>
             <View style={[styles.content, { backgroundColor: colors.background }]}>
                 <View style={[styles.logoHeader, { borderBottomColor: colors.border }]}>
                     <Image
@@ -123,31 +145,41 @@ export default function HomeScreen() {
                 <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Select Transaction Type</Text>
 
                 <View style={styles.gridContainer}>
-                    {menuItems.map((item) => (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={[styles.card, { backgroundColor: colors.card, borderLeftColor: item.color }]}
-                            onPress={() => router.push(item.route as any)}
-                            activeOpacity={0.7}
-                        >
-                            <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
+                    {menuItems.map((item) => {
+                        const count = todayCounts[item.id] ?? 0;
+                        return (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[styles.card, { backgroundColor: colors.card, borderLeftColor: item.color }]}
+                                onPress={() => router.push(item.route as any)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
+                                    <MaterialCommunityIcons
+                                        name={item.icon as any}
+                                        size={40}
+                                        color={item.color}
+                                    />
+                                </View>
+                                <View style={styles.cardContent}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{item.title}</Text>
+                                        {count > 0 && (
+                                            <View style={[styles.badge, { backgroundColor: item.color }]}>
+                                                <Text style={styles.badgeText}>{count} today</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
+                                </View>
                                 <MaterialCommunityIcons
-                                    name={item.icon as any}
-                                    size={40}
-                                    color={item.color}
+                                    name="chevron-right"
+                                    size={24}
+                                    color={colors.textSecondary}
                                 />
-                            </View>
-                            <View style={styles.cardContent}>
-                                <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{item.title}</Text>
-                                <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
-                            </View>
-                            <MaterialCommunityIcons
-                                name="chevron-right"
-                                size={24}
-                                color={colors.textSecondary}
-                            />
-                        </TouchableOpacity>
-                    ))}
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
             </View>
         </SafeAreaView>
@@ -217,12 +249,28 @@ const styles = StyleSheet.create({
     cardContent: {
         flex: 1,
     },
+    cardTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: SPACING.sm,
+        marginBottom: 4,
+    },
     cardTitle: {
         fontSize: 18,
         fontWeight: '600',
-        marginBottom: 4,
     },
     cardSubtitle: {
         fontSize: 14,
+    },
+    badge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+    },
+    badgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#fff',
     },
 });

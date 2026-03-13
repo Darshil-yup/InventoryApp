@@ -155,94 +155,41 @@ export default function ProjectPartsViewer({
 
     return (
         <View style={styles.container}>
-            {/* Mode Toggle Header */}
+            {/* Header & Search */}
             <Card style={styles.modeCard}>
                 <View style={styles.modeHeader}>
                     <View style={styles.modeInfo}>
                         <MaterialCommunityIcons
-                            name={editingRowIndex !== null ? 'pencil' : 'eye-outline'}
+                            name="format-list-bulleted"
                             size={22}
                             color={colors.accent}
                         />
                         <View style={styles.modeTextContainer}>
                             <Text style={[styles.modeTitle, { color: colors.textPrimary }]}>
-                                {editingRowIndex !== null ? 'Edit Mode' : 'View Mode'}
+                                {entries.length} Part(s) Loaded
                             </Text>
                             <Text style={[styles.modeSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                                {entries.length} part(s) loaded
+                                Tap any row to edit its quantity
                             </Text>
                         </View>
-                    </View>
-
-                    {/* Segmented Control Toggle */}
-                    <View style={styles.segmentedControl}>
-                        <TouchableOpacity
-                            style={[
-                                styles.segmentButton,
-                                styles.segmentLeft,
-                                editingRowIndex === null && styles.segmentActive,
-                                editingRowIndex === null && { backgroundColor: colors.primary }
-                            ]}
-                            onPress={() => setEditingRowIndex(null)}
-                            activeOpacity={0.8}
-                        >
-                            <MaterialCommunityIcons
-                                name="format-list-bulleted"
-                                size={16}
-                                color={editingRowIndex === null ? '#fff' : colors.textSecondary}
-                            />
-                            <Text style={[
-                                styles.segmentText,
-                                { color: editingRowIndex === null ? '#fff' : colors.textSecondary }
-                            ]}>
-                                View All
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.segmentButton,
-                                styles.segmentRight,
-                                editingRowIndex !== null && styles.segmentActive,
-                                editingRowIndex !== null && { backgroundColor: COLORS.warning }
-                            ]}
-                            onPress={() => {
-                                // Default logic: open the first one for edit if none is open
-                                if (editingRowIndex === null && filteredEntries.length > 0) {
-                                    setEditingRowIndex(filteredEntries[0].originalIndex);
-                                }
-                            }}
-                            activeOpacity={0.8}
-                        >
-                            <MaterialCommunityIcons
-                                name="pencil"
-                                size={16}
-                                color={editingRowIndex !== null ? '#fff' : colors.textSecondary}
-                            />
-                            <Text style={[
-                                styles.segmentText,
-                                { color: editingRowIndex !== null ? '#fff' : colors.textSecondary }
-                            ]}>
-                                Edit Row
-                            </Text>
-                        </TouchableOpacity>
                     </View>
                 </View>
 
                 {/* Search Bar */}
                 <View style={styles.searchContainer}>
-                    <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} style={styles.searchIcon} />
                     <Input
                         placeholder="Search by Part No. or Description..."
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        style={{ flex: 1, marginBottom: 0 }}
+                        leftElement={<MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} style={{ paddingLeft: SPACING.sm, paddingRight: SPACING.xs }} />}
+                        rightElement={
+                            searchQuery.length > 0 ? (
+                                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: SPACING.sm }}>
+                                    <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
+                                </TouchableOpacity>
+                            ) : undefined
+                        }
                     />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
-                            <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
-                        </TouchableOpacity>
-                    )}
                 </View>
             </Card>
 
@@ -258,29 +205,32 @@ export default function ProjectPartsViewer({
                         No parts in this project yet
                     </Text>
                     <Text style={[styles.emptySubtext, { color: colors.textLight }]}>
-                        Click 'Add Another Part' below to add parts
+                        Click &apos;Add Another Part&apos; below to add parts
                     </Text>
                 </Card>
             ) : (
-                <ScrollView
-                    style={styles.tableScrollView}
-                    stickyHeaderIndices={[0]}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Sticky Table Header */}
+                <View style={[styles.tableWrapper, { borderColor: colors.border }]}>
+                    {/* Table Header */}
                     <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                         <Text style={[styles.tableHeaderText, { flex: 2, color: colors.textSecondary }]}>CBF Part No.</Text>
 
                         {transactionType === 'mto' ? (
                             <>
-                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Req.</Text>
-                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Pulled</Text>
-                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Rem.</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Req. Qty</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Pulled Qty</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Rem. Qty</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Action</Text>
                             </>
                         ) : transactionType === 'requisition' ? (
-                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Req. Qty</Text>
+                            <>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Req. Qty</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Action</Text>
+                            </>
                         ) : (
-                            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Qty</Text>
+                            <>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Qty</Text>
+                                <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right', color: colors.textSecondary }]}>Action</Text>
+                            </>
                         )}
                     </View>
 
@@ -370,7 +320,7 @@ export default function ProjectPartsViewer({
                                 );
                             }
 
-                            // VIEW MODE ROW
+                            {/* VIEW MODE ROW */ }
                             return (
                                 <TouchableOpacity
                                     key={originalIndex}
@@ -399,17 +349,37 @@ export default function ProjectPartsViewer({
                                             <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: COLORS.warning, fontWeight: '700' }]}>
                                                 {(entry.required_quantity || 0) - (entry.pulled_quantity || 0)}
                                             </Text>
+                                            {/* Action Column */}
+                                            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                                <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.accent} />
+                                            </View>
+                                        </>
+                                    ) : transactionType === 'requisition' ? (
+                                        <>
+                                            <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>
+                                                {entry.quantity || 0}
+                                            </Text>
+                                            {/* Action Column */}
+                                            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                                <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.accent} />
+                                            </View>
                                         </>
                                     ) : (
-                                        <Text style={[styles.cellText, { flex: 1, textAlign: 'right', color: colors.textPrimary }]}>
-                                            {entry.quantity || 0}
-                                        </Text>
+                                        <>
+                                            <Text style={[styles.cellText, { flex: 1, textAlign: 'center', color: colors.textPrimary }]}>
+                                                {entry.quantity || 0}
+                                            </Text>
+                                            {/* Action Column */}
+                                            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                                <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.accent} />
+                                            </View>
+                                        </>
                                     )}
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
-                </ScrollView>
+                </View>
             )}
 
             <Button
@@ -463,42 +433,7 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     modeSubtitle: {
-        fontSize: 11,
-    },
-    segmentedControl: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.border,
-        borderRadius: BORDER_RADIUS.md,
-        padding: 2,
-        flexShrink: 0,
-    },
-    segmentButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: SPACING.sm,
-        paddingVertical: SPACING.xs,
-        gap: 4,
-        minWidth: 60,
-    },
-    segmentLeft: {
-        borderTopLeftRadius: BORDER_RADIUS.sm,
-        borderBottomLeftRadius: BORDER_RADIUS.sm,
-    },
-    segmentRight: {
-        borderTopRightRadius: BORDER_RADIUS.sm,
-        borderBottomRightRadius: BORDER_RADIUS.sm,
-    },
-    segmentActive: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    segmentText: {
         fontSize: 12,
-        fontWeight: '700',
     },
     entryCard: {
         marginBottom: SPACING.md,
@@ -527,28 +462,13 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.md,
     },
     searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
         marginTop: SPACING.md,
-        gap: SPACING.sm,
     },
-    searchIcon: {
-        marginRight: -SPACING.md,
-        zIndex: 1,
-        paddingLeft: SPACING.sm,
-    },
-    clearSearchBtn: {
-        position: 'absolute',
-        right: SPACING.sm,
-        padding: SPACING.xs,
-    },
-    tableScrollView: {
-        maxHeight: 450,
-        backgroundColor: COLORS.card,
+    tableWrapper: {
         borderRadius: BORDER_RADIUS.md,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: COLORS.border,
+        marginBottom: SPACING.md,
     },
     tableHeader: {
         flexDirection: 'row',

@@ -286,6 +286,11 @@ class InventoryCreate(BaseModel):
     recording_date: str
     entries: List[InventoryEntry]
 
+class InventoryUpdate(BaseModel):
+    employee_name: str
+    original_date: str
+    entries: List[InventoryEntry]
+
 class InventoryRecord(BaseModel):
     date_time: str
     employee_name: str
@@ -459,105 +464,118 @@ async def get_projects():
         logger.error(f"Error fetching projects: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def _parse_date(date_str: str):
+    """Parse a date or datetime string into a datetime for comparison. Returns datetime.min on failure."""
+    for fmt in (
+        "%d/%m/%Y %H:%M:%S",  # full timestamp (new records)
+        "%d/%m/%Y %H:%M",     # timestamp without seconds
+        "%d/%m/%Y",           # date only (legacy records)
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%d-%m-%Y",
+        "%m/%d/%Y",
+    ):
+        try:
+            return datetime.strptime(date_str.strip(), fmt)
+        except ValueError:
+            pass
+    return datetime.min
+
+
 @api_router.get("/projects/{project_number}/parts", response_model=List[ProjectPart])
 async def get_project_parts(project_number: str):
-    """Get all parts used in a project from transaction history"""
+    """
+    Get parts used in a project, showing only the LATEST transaction entry per part.
+    For each (project, cbf_part_number) pair, we keep the record with the most recent date.
+    """
     try:
         # Dictionary to aggregate parts: cbf_part_no -> part data
+        # We also track the latest date seen per part per transaction type so we
+        # only update a quantity if the incoming row is newer.
         parts_map = {}
-        
-        # Fetch from MTO Records
+        # Separate date trackers so requisition / receiving / mto dates don't interfere
+        latest_mto_date: dict = {}
+        latest_rcv_date: dict = {}
+        latest_req_date: dict = {}
+
+        def _ensure_part(cbf_part: str, row: list):
+            """Initialise a part entry in parts_map if not already present."""
+            if cbf_part not in parts_map:
+                parts_map[cbf_part] = {
+                    "cbf_part_no": cbf_part,
+                    "vendor_part_no": row[4] if len(row) > 4 else "",
+                    "finish":         row[5] if len(row) > 5 else "",
+                    "part_description": "",
+                    "mto_required":   0,
+                    "mto_pulled":     0,
+                    "receiving_qty":  0,
+                    "requisition_qty": 0,
+                }
+
+        # ── MTO Records ──────────────────────────────────────────────────────
         try:
-            mto_sheet = get_worksheet("mto")
-            mto_rows = mto_sheet.get_all_values()
-            # Columns: Date, Employee, Project, CBF Part Number, Ven. Part No., Finish, Required Qty, Pulled Qty, Remaining
-            for row in mto_rows[1:]:  # Skip header
-                if len(row) >= 9 and row[2] == project_number:  # Match project
+            mto_rows = get_worksheet("mto").get_all_values()
+            # Columns: Date, Employee, Project, CBF Part No, Ven.Part No, Finish, Req Qty, Pulled Qty, Remaining
+            for row in mto_rows[1:]:
+                if len(row) >= 9 and row[2] == project_number:
                     cbf_part = row[3]
-                    if cbf_part not in parts_map:
-                        parts_map[cbf_part] = {
-                            "cbf_part_no": cbf_part,
-                            "vendor_part_no": row[4] if len(row) > 4 else "",
-                            "finish": row[5] if len(row) > 5 else "",
-                            "part_description": "",
-                            "mto_required": 0,
-                            "mto_pulled": 0,
-                            "receiving_qty": 0,
-                            "requisition_qty": 0,
-                        }
-                    # Aggregate MTO quantities (sum all entries)
-                    parts_map[cbf_part]["mto_required"] += int(row[6]) if row[6] else 0
-                    parts_map[cbf_part]["mto_pulled"] += int(row[7]) if row[7] else 0
+                    row_date = _parse_date(row[0])
+                    _ensure_part(cbf_part, row)
+                    # Only update if this row is the latest seen for MTO
+                    if row_date >= latest_mto_date.get(cbf_part, datetime.min):
+                        latest_mto_date[cbf_part] = row_date
+                        parts_map[cbf_part]["mto_required"] = int(row[6]) if row[6] else 0
+                        parts_map[cbf_part]["mto_pulled"]   = int(row[7]) if len(row) > 7 and row[7] else 0
         except Exception as e:
             logger.warning(f"Error fetching MTO records: {e}")
-        
-        # Fetch from Receiving Records
+
+        # ── Receiving Records ─────────────────────────────────────────────────
         try:
-            recv_sheet = get_worksheet("receiving")
-            recv_rows = recv_sheet.get_all_values()
-            # Columns: Date, Employee, Project, Part Number, Ven. Part No., Finish, Quantity
-            for row in recv_rows[1:]:  # Skip header
+            recv_rows = get_worksheet("receiving").get_all_values()
+            # Columns: Date, Employee, Project, Part No, Ven.Part No, Finish, Quantity
+            for row in recv_rows[1:]:
                 if len(row) >= 7 and row[2] == project_number:
                     cbf_part = row[3]
-                    if cbf_part not in parts_map:
-                        parts_map[cbf_part] = {
-                            "cbf_part_no": cbf_part,
-                            "vendor_part_no": row[4] if len(row) > 4 else "",
-                            "finish": row[5] if len(row) > 5 else "",
-                            "part_description": "",
-                            "mto_required": 0,
-                            "mto_pulled": 0,
-                            "receiving_qty": 0,
-                            "requisition_qty": 0,
-                        }
-                    parts_map[cbf_part]["receiving_qty"] += int(row[6]) if row[6] else 0
+                    row_date = _parse_date(row[0])
+                    _ensure_part(cbf_part, row)
+                    # Only update if this row is the latest seen for Receiving
+                    if row_date >= latest_rcv_date.get(cbf_part, datetime.min):
+                        latest_rcv_date[cbf_part] = row_date
+                        parts_map[cbf_part]["receiving_qty"] = int(row[6]) if row[6] else 0
         except Exception as e:
             logger.warning(f"Error fetching Receiving records: {e}")
-        
-        # Fetch from Requisition Records
+
+        # ── Requisition Records ───────────────────────────────────────────────
         try:
-            req_sheet = get_worksheet("requisition")
-            req_rows = req_sheet.get_all_values()
-            # Columns: Date, Employee, Project, Part Number, Ven. Part No., Finish, Required Quantity
-            for row in req_rows[1:]:  # Skip header
+            req_rows = get_worksheet("requisition").get_all_values()
+            # Columns: Date, Employee, Project, Part No, Ven.Part No, Finish, Required Qty
+            for row in req_rows[1:]:
                 if len(row) >= 7 and row[2] == project_number:
                     cbf_part = row[3]
-                    if cbf_part not in parts_map:
-                        parts_map[cbf_part] = {
-                            "cbf_part_no": cbf_part,
-                            "vendor_part_no": row[4] if len(row) > 4 else "",
-                            "finish": row[5] if len(row) > 5 else "",
-                            "part_description": "",
-                            "mto_required": 0,
-                            "mto_pulled": 0,
-                            "receiving_qty": 0,
-                            "requisition_qty": 0,
-                        }
-                    parts_map[cbf_part]["requisition_qty"] += int(row[6]) if row[6] else 0
+                    row_date = _parse_date(row[0])
+                    _ensure_part(cbf_part, row)
+                    # Only update if this row is the latest seen for Requisition
+                    if row_date >= latest_req_date.get(cbf_part, datetime.min):
+                        latest_req_date[cbf_part] = row_date
+                        parts_map[cbf_part]["requisition_qty"] = int(row[6]) if row[6] else 0
         except Exception as e:
             logger.warning(f"Error fetching Requisition records: {e}")
-        
-        # Enrich with part descriptions from master parts list
+
+        # ── Enrich with part descriptions ─────────────────────────────────────
         try:
-            parts_sheet = get_worksheet("parts")
-            parts_rows = parts_sheet.get_all_values()
-            # Create lookup map: cbf_part_no -> description
+            parts_rows = get_worksheet("parts").get_all_values()
             parts_desc_map = {}
             for row in parts_rows[1:]:
                 if len(row) >= 6 and row[2]:
-                    parts_desc_map[row[2]] = row[5]  # part_description
-            
-            # Enrich parts_map with descriptions
+                    parts_desc_map[row[2]] = row[5]
             for cbf_part in parts_map:
                 if cbf_part in parts_desc_map:
                     parts_map[cbf_part]["part_description"] = parts_desc_map[cbf_part]
         except Exception as e:
             logger.warning(f"Error enriching part descriptions: {e}")
-        
-        # Convert to list of ProjectPart objects
-        result = [ProjectPart(**data) for data in parts_map.values()]
-        
-        return result
+
+        return [ProjectPart(**data) for data in parts_map.values()]
+
     except Exception as e:
         logger.error(f"Error fetching project parts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -628,7 +646,7 @@ async def create_requisition(req: RequisitionCreate):
     """Create requisition record(s)"""
     try:
         sheet = get_worksheet("requisition")
-        current_time = datetime.now().strftime("%d/%m/%Y")
+        current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
         created_records = []
         for entry in req.entries:
@@ -669,7 +687,7 @@ async def create_receiving(rec: ReceivingCreate):
     """Create receiving record(s)"""
     try:
         sheet = get_worksheet("receiving")
-        current_time = datetime.now().strftime("%d/%m/%Y")
+        current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
         created_records = []
         for entry in rec.entries:
@@ -710,7 +728,7 @@ async def create_mto(mto: MTOCreate):
     """Create MTO record(s)"""
     try:
         sheet = get_worksheet("mto")
-        current_time = datetime.now().strftime("%d/%m/%Y")
+        current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
         created_records = []
         for entry in mto.entries:
@@ -759,7 +777,7 @@ async def create_inventory(inv: InventoryCreate):
     try:
         sheet = get_worksheet("inventory")
         # Use today's date as 'date and time' (col 0) — what the dropdown uses to group records
-        current_time = datetime.now().strftime("%d/%m/%Y")
+        current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
         created_records = []
         for entry in inv.entries:
@@ -802,22 +820,108 @@ async def create_inventory(inv: InventoryCreate):
         logger.error(f"Error creating inventory: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/inventory/update_row")
+async def update_inventory_row(data: dict):
+    """Safely update a single inventory row identified by date + part + rack + level + bin.
+    Only modifies the matched row. All other rows for that date remain completely untouched."""
+    try:
+        sheet = get_worksheet("inventory")
+        rows = sheet.get_all_values()
+        if len(rows) < 2:
+            raise HTTPException(status_code=404, detail="No inventory records found.")
+
+        # Resolve columns from header
+        header = [h.strip().lower() for h in rows[0]]
+        def col(names, fallback):
+            for name in names:
+                if name in header:
+                    return header.index(name)
+            return fallback
+
+        c_date  = col(["date and time", "date", "date/time", "datetime"], 0)
+        c_emp   = col(["employee name", "employee"], 1)
+        c_part  = col(["part number", "cbf part number", "cbf_part_number"], 4)
+        c_rack  = col(["rack"], 5)
+        c_level = col(["level"], 6)
+        c_bin   = col(["bin"], 7)
+        c_qty   = col(["quantity"], 8)
+
+        # Fields to match (identify the old row)
+        original_date  = data.get("original_date", "")
+        original_part  = data.get("original_part", "")
+        original_rack  = data.get("original_rack", "")
+        original_level = data.get("original_level", "")
+        original_bin   = data.get("original_bin", "")
+
+        # New values to write
+        new_part     = data.get("cbf_part_number", original_part)
+        new_rack     = data.get("rack", original_rack)
+        new_level    = data.get("level", original_level)
+        new_bin      = data.get("bin", original_bin)
+        new_quantity = data.get("quantity", 0)
+        employee     = data.get("employee_name", "")
+
+        # Normalise the target date for comparison
+        req_date_parsed = _parse_date(original_date)
+        req_date_str = req_date_parsed.strftime("%d/%m/%Y") if req_date_parsed != datetime.min else original_date.strip()
+
+        # Find the exact matching row (date + part + rack + level + bin)
+        target_row_idx = None
+        for idx, row in enumerate(rows[1:], start=2):  # gspread 1-indexed; skip header
+            if len(row) <= c_date or not row[c_date]:
+                continue
+            row_parsed = _parse_date(row[c_date])
+            row_date_str = row_parsed.strftime("%d/%m/%Y") if row_parsed != datetime.min else row[c_date].strip()
+            if row_date_str != req_date_str:
+                continue
+            r_part  = row[c_part].strip()  if len(row) > c_part  else ""
+            r_rack  = row[c_rack].strip()  if len(row) > c_rack  else ""
+            r_level = row[c_level].strip() if len(row) > c_level else ""
+            r_bin   = row[c_bin].strip()   if len(row) > c_bin   else ""
+            if (r_part == original_part and r_rack == original_rack
+                    and r_level == original_level and r_bin == original_bin):
+                target_row_idx = idx
+                break
+
+        if target_row_idx is None:
+            # Row not found — append as a new record (handles "Add Another Item" case)
+            req_date_str_for_ts = req_date_str if req_date_str else datetime.now().strftime("%d/%m/%Y")
+            current_time = datetime.now().strftime(f"{req_date_str_for_ts} %H:%M:%S")
+            new_row = [
+                current_time, employee, "Cycle Count", "",
+                new_part, new_rack, new_level, new_bin, str(new_quantity)
+            ]
+            sheet.append_row(new_row)
+            logger.info(f"Inventory row not found for update — appended new row for {new_part} on {req_date_str}")
+            return {"success": True, "action": "appended"}
+
+        # Update only the specific cells of the matched row — all other rows untouched
+        sheet.update_cell(target_row_idx, c_emp   + 1, employee)
+        sheet.update_cell(target_row_idx, c_part  + 1, new_part)
+        sheet.update_cell(target_row_idx, c_rack  + 1, new_rack)
+        sheet.update_cell(target_row_idx, c_level + 1, new_level)
+        sheet.update_cell(target_row_idx, c_bin   + 1, new_bin)
+        sheet.update_cell(target_row_idx, c_qty   + 1, str(new_quantity))
+
+        logger.info(f"Updated inventory row {target_row_idx}: {original_part} → {new_part}, qty={new_quantity}")
+        return {"success": True, "action": "updated", "row": target_row_idx}
+
+    except Exception as e:
+        logger.error(f"Error updating inventory row: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ===== INVENTORY QUERY ENDPOINTS =====
 @api_router.get("/inventory/dates")
 async def get_inventory_dates():
-    """Get list of unique entry dates from inventory records"""
-    import re
-    DATE_RE = re.compile(r'^\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}$|^\d{4}[/\-]\d{2}[/\-]\d{2}$')
+    """Get list of unique entry DATES (DD/MM/YYYY) from inventory records.
+    Strips any time component from the stored timestamp so same-day entries are grouped together."""
     try:
         sheet = get_worksheet("inventory")
         rows = sheet.get_all_values()
-        if len(rows) < 2:  # no data rows
+        if len(rows) < 2:
             return []
 
-        # The sheet header is: date and time | employee name | recording type | project |
-        #                        part number | rack | level | bin | quantity
-        # Dates live in col 0 ('date and time')
         header = [h.strip().lower() for h in rows[0]]
         date_col = next((i for i, h in enumerate(header)
                          if h in ("date and time", "date", "date/time", "datetime")), 0)
@@ -827,20 +931,18 @@ async def get_inventory_dates():
         for row in rows[1:]:
             if len(row) > date_col and row[date_col]:
                 val = row[date_col].strip()
-                if DATE_RE.match(val):
-                    dates.add(val)
+                # Try to parse as full timestamp or date-only, then normalise to DD/MM/YYYY
+                parsed = _parse_date(val)
+                if parsed != datetime.min:
+                    dates.add(parsed.strftime("%d/%m/%Y"))
 
         logger.info(f"Found {len(dates)} unique dates")
 
-        def sort_key(d):
-            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y"):
-                try:
-                    return datetime.strptime(d, fmt)
-                except ValueError:
-                    pass
-            return datetime.min
-
-        return sorted(list(dates), key=sort_key, reverse=True)
+        return sorted(
+            list(dates),
+            key=lambda d: _parse_date(d),
+            reverse=True
+        )
     except Exception as e:
         logger.error(f"Error fetching inventory dates: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -848,7 +950,8 @@ async def get_inventory_dates():
 
 @api_router.get("/inventory/by-date")
 async def get_inventory_by_date(date: str):
-    """Get all inventory records for a specific date (pass date as ?date=DD/MM/YYYY)"""
+    """Get all inventory records for a specific date (pass date as ?date=DD/MM/YYYY).
+    Matches rows whose date portion equals the requested date, regardless of any time suffix."""
     try:
         sheet = get_worksheet("inventory")
         rows = sheet.get_all_values()
@@ -872,22 +975,29 @@ async def get_inventory_by_date(date: str):
         c_bin   = col(["bin"], 7)
         c_qty   = col(["quantity"], 8)
 
+        # Normalise the requested date to DD/MM/YYYY for comparison
+        req_date_parsed = _parse_date(date)
+        req_date_str = req_date_parsed.strftime("%d/%m/%Y") if req_date_parsed != datetime.min else date.strip()
+
         inventory_items = []
         for row in rows[1:]:
-            if len(row) > c_date and row[c_date].strip() == date.strip():
-                def safe(idx, default=""):
-                    return row[idx].strip() if len(row) > idx else default
-                inventory_items.append({
-                    "cbf_part_no":    safe(c_part),
-                    "vendor_part_no": "",  # not in existing sheet
-                    "finish":         "",  # not in existing sheet
-                    "recording_type": safe(c_rec),
-                    "project":        safe(c_proj),
-                    "rack":           safe(c_rack),
-                    "level":          safe(c_level),
-                    "bin":            safe(c_bin),
-                    "quantity":       int(safe(c_qty, "0") or 0),
-                })
+            if len(row) > c_date and row[c_date]:
+                row_parsed = _parse_date(row[c_date])
+                row_date_str = row_parsed.strftime("%d/%m/%Y") if row_parsed != datetime.min else row[c_date].strip()
+                if row_date_str == req_date_str:
+                    def safe(idx, default=""):
+                        return row[idx].strip() if len(row) > idx else default
+                    inventory_items.append({
+                        "cbf_part_no":    safe(c_part),
+                        "vendor_part_no": "",
+                        "finish":         "",
+                        "recording_type": safe(c_rec),
+                        "project":        safe(c_proj),
+                        "rack":           safe(c_rack),
+                        "level":          safe(c_level),
+                        "bin":            safe(c_bin),
+                        "quantity":       int(safe(c_qty, "0") or 0),
+                    })
 
         return inventory_items
     except Exception as e:
@@ -942,6 +1052,14 @@ async def startup_prewarm():
     This means the FIRST user request is also fast (no cold-start penalty).
     """
     logger.info("Pre-warming caches in background...")
+    
+    # Authenticate synchronously ONCE before spawning threads. 
+    # Otherwise, 3 threads will race to authenticate at the exact same millisecond.
+    try:
+        get_sheets_client()
+    except Exception as e:
+        logger.warning(f"Initial gspread auth failed: {e}")
+
     loop = asyncio.get_event_loop()
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
     # Fire all three concurrently, don't await — server starts immediately

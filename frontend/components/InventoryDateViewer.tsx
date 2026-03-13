@@ -18,6 +18,7 @@ import Input from './ui/Input';
 import SearchablePartSelector from './SearchablePartSelector';
 import QRScanner from './QRScanner';
 import { useMasterData } from '../contexts/MasterDataContext';
+import SuccessModal from './ui/SuccessModal';
 
 interface Part {
     cbf_part_no: string;
@@ -39,9 +40,10 @@ interface InventoryItem {
 interface InventoryDateViewerProps {
     selectedDate: string;  // YYYY-MM-DD format or DD/MM/YYYY
     parts: Part[];
+    employeeName: string;
 }
 
-export default function InventoryDateViewer({ selectedDate, parts: propParts }: InventoryDateViewerProps) {
+export default function InventoryDateViewer({ selectedDate, parts: propParts, employeeName }: InventoryDateViewerProps) {
     const { isDark } = useTheme();
     const colors = getThemeColors(isDark);
     // Use shared context parts if available (avoid prop-drilling; context is faster after first load)
@@ -50,11 +52,18 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
     const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+    // Snapshot of items as loaded from backend — used to detect which rows were actually changed
+    const [originalItems, setOriginalItems] = useState<InventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [scannerVisible, setScannerVisible] = useState(false);
     const [locationScanItemIndex, setLocationScanItemIndex] = useState<number | null>(null);
     // Ref ensures the latest index is always available inside the scan callback (no stale closure)
     const locationScanItemIndexRef = useRef<number | null>(null);
+    const [successModal, setSuccessModal] = useState({
+        visible: false,
+        message: ''
+    });
 
     useEffect(() => {
         if (selectedDate) {
@@ -67,6 +76,8 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
             setLoading(true);
             const response = await apiClient.get(`/api/inventory/by-date`, { params: { date: selectedDate } });
             setInventoryItems(response.data);
+            // Keep a deep snapshot so we know which rows changed
+            setOriginalItems(JSON.parse(JSON.stringify(response.data)));
         } catch (error) {
             console.error('Error loading inventory:', error);
             Alert.alert('Error', 'Failed to load inventory for selected date');
@@ -83,8 +94,24 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
     };
 
     const removeItem = (index: number) => {
-        const newItems = inventoryItems.filter((_, i) => i !== index);
-        setInventoryItems(newItems);
+        const item = inventoryItems[index];
+        const partLabel = item.cbf_part_no || `Item #${index + 1}`;
+        Alert.alert(
+            'Remove Item',
+            `Are you sure you want to remove "${partLabel}" from this inventory record?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: () => {
+                        const newItems = inventoryItems.filter((_, i) => i !== index);
+                        setInventoryItems(newItems);
+                        if (editingRowIndex === index) setEditingRowIndex(null);
+                    }
+                },
+            ]
+        );
     };
 
     const updateItem = (index: number, field: keyof InventoryItem, value: any) => {
@@ -140,6 +167,88 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
         setLocationScanItemIndex(null);
     };
 
+    const handleSaveChanges = async () => {
+        // Validate all visible items
+        const invalidItems = inventoryItems.filter(i => !i.cbf_part_no || !i.quantity);
+        if (invalidItems.length > 0) {
+            Alert.alert('Validation Error', 'All items must have a part number and quantity greater than 0.');
+            return;
+        }
+
+        try {
+            setSaving(true);
+            let updatedCount = 0;
+
+            for (let i = 0; i < inventoryItems.length; i++) {
+                const current = inventoryItems[i];
+                const original = originalItems[i]; // undefined for newly added items
+
+                const qty = typeof current.quantity === 'string' ? parseInt(current.quantity) : current.quantity;
+
+                if (!original) {
+                    // NEW item added via "Add Another Item" — append to sheet
+                    await apiClient.post('/api/inventory/update_row', {
+                        employee_name: employeeName,
+                        original_date: selectedDate,
+                        original_part:  '',
+                        original_rack:  '',
+                        original_level: '',
+                        original_bin:   '',
+                        cbf_part_number: current.cbf_part_no,
+                        rack:  current.rack,
+                        level: current.level,
+                        bin:   current.bin,
+                        quantity: qty,
+                    });
+                    updatedCount++;
+                } else {
+                    // Existing item — only call API if something actually changed
+                    const origQty = typeof original.quantity === 'string' ? parseInt(original.quantity) : original.quantity;
+                    const changed =
+                        current.cbf_part_no !== original.cbf_part_no ||
+                        current.rack        !== original.rack ||
+                        current.level       !== original.level ||
+                        current.bin         !== original.bin ||
+                        qty                 !== origQty;
+
+                    if (changed) {
+                        await apiClient.post('/api/inventory/update_row', {
+                            employee_name:  employeeName,
+                            original_date:  selectedDate,
+                            original_part:  original.cbf_part_no,
+                            original_rack:  original.rack,
+                            original_level: original.level,
+                            original_bin:   original.bin,
+                            cbf_part_number: current.cbf_part_no,
+                            rack:  current.rack,
+                            level: current.level,
+                            bin:   current.bin,
+                            quantity: qty,
+                        });
+                        updatedCount++;
+                    }
+                }
+            }
+
+            setEditingRowIndex(null);
+            if (updatedCount === 0) {
+                Alert.alert('No Changes', 'No items were modified.');
+            } else {
+                setSuccessModal({
+                    visible: true,
+                    message: `${updatedCount} item${updatedCount > 1 ? 's' : ''} updated successfully for ${selectedDate}.`,
+                });
+            }
+            // Refresh to reflect saved state and reset originalItems snapshot
+            loadInventoryForDate();
+        } catch (error) {
+            console.error('Error saving inventory edits:', error);
+            Alert.alert('Error', 'Failed to save changes. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     // Filter items based on search query
     const filteredItems = inventoryItems.map((item, index) => ({ item, originalIndex: index })).filter(({ item }) => {
         if (!searchQuery) return true;
@@ -180,75 +289,26 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                             Inventory for {selectedDate}
                         </Text>
                     </View>
-
-                    {/* View/Edit Toggle */}
-                    <View style={styles.segmentedControl}>
-                        <TouchableOpacity
-                            style={[
-                                styles.segmentButton,
-                                styles.segmentLeft,
-                                editingRowIndex === null && styles.segmentActive,
-                                editingRowIndex === null && { backgroundColor: colors.primary }
-                            ]}
-                            onPress={() => setEditingRowIndex(null)}
-                            activeOpacity={0.8}
-                        >
-                            <MaterialCommunityIcons
-                                name="format-list-bulleted"
-                                size={16}
-                                color={editingRowIndex === null ? '#fff' : colors.textSecondary}
-                            />
-                            <Text style={[
-                                styles.segmentText,
-                                { color: editingRowIndex === null ? '#fff' : colors.textSecondary }
-                            ]}>
-                                View All
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.segmentButton,
-                                styles.segmentRight,
-                                editingRowIndex !== null && styles.segmentActive,
-                                editingRowIndex !== null && { backgroundColor: COLORS.warning }
-                            ]}
-                            onPress={() => {
-                                if (editingRowIndex === null && filteredItems.length > 0) {
-                                    setEditingRowIndex(filteredItems[0].originalIndex);
-                                }
-                            }}
-                            activeOpacity={0.8}
-                        >
-                            <MaterialCommunityIcons
-                                name="pencil"
-                                size={16}
-                                color={editingRowIndex !== null ? '#fff' : colors.textSecondary}
-                            />
-                            <Text style={[
-                                styles.segmentText,
-                                { color: editingRowIndex !== null ? '#fff' : colors.textSecondary }
-                            ]}>
-                                Edit Row
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                    <Text style={[styles.headerCount, { color: colors.textSecondary }]}>
+                        {inventoryItems.length} item(s) · Tap to edit
+                    </Text>
                 </View>
 
                 {/* Search Bar */}
                 <View style={styles.searchContainer}>
-                    <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} style={styles.searchIcon} />
                     <Input
                         placeholder="Search by Part No. or Description..."
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        style={{ flex: 1, marginBottom: 0 }}
+                        leftElement={<MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} style={{ paddingLeft: SPACING.sm, paddingRight: SPACING.xs }} />}
+                        rightElement={
+                            searchQuery.length > 0 ? (
+                                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: SPACING.sm }}>
+                                    <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
+                                </TouchableOpacity>
+                            ) : undefined
+                        }
                     />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
-                            <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
-                        </TouchableOpacity>
-                    )}
                 </View>
 
                 {inventoryItems.length === 0 ? (
@@ -262,17 +322,13 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                                 title="Add First Item"
                                 onPress={() => { addItem(); setEditingRowIndex(0); }}
                                 style={styles.addButton}
-                                icon={<MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />}
+                                icon={<MaterialCommunityIcons name="plus" size={20} color={isDark ? colors.textPrimary : colors.primary} />}
                             />
                         )}
                     </View>
                 ) : (
-                    <ScrollView
-                        style={styles.tableScrollView}
-                        stickyHeaderIndices={[0]}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {/* Sticky Table Header */}
+                    <View style={[styles.tableWrapper, { borderColor: colors.border }]}>
+                        {/* Table Header */}
                         <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                             <Text style={[styles.tableHeaderText, { flex: 2, color: colors.textSecondary }]}>CBF Part No.</Text>
                             <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center', color: colors.textSecondary }]}>Rack</Text>
@@ -315,11 +371,11 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                                             />
                                             {/* Single QR scan fills Rack, Level & Bin */}
                                             <TouchableOpacity
-                                                style={[styles.scanLocationBtn, { borderColor: colors.primary }]}
+                                                style={[styles.scanLocationBtn, { borderColor: isDark ? colors.border : colors.primary }]}
                                                 onPress={() => openLocationScanner(originalIndex)}
                                             >
-                                                <MaterialCommunityIcons name="qrcode-scan" size={18} color={colors.primary} />
-                                                <Text style={[styles.scanLocationText, { color: colors.primary }]}>Scan Location (Rack–Level–Bin)</Text>
+                                                <MaterialCommunityIcons name="qrcode-scan" size={18} color={isDark ? colors.textPrimary : colors.primary} />
+                                                <Text style={[styles.scanLocationText, { color: isDark ? colors.textPrimary : colors.primary }]}>Scan Location (Rack–Level–Bin)</Text>
                                             </TouchableOpacity>
 
                                             <View style={styles.row}>
@@ -391,11 +447,14 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                                         <Text style={[styles.cellText, { flex: 1, textAlign: 'right', color: colors.textPrimary }]}>
                                             {item.quantity || 0}
                                         </Text>
+                                        <View style={{ alignItems: 'flex-end', paddingLeft: SPACING.xs }}>
+                                            <MaterialCommunityIcons name="pencil-outline" size={16} color={colors.accent} />
+                                        </View>
                                     </TouchableOpacity>
                                 );
                             })}
                         </View>
-                    </ScrollView>
+                    </View>
                 )}
 
                 <Button
@@ -403,9 +462,35 @@ export default function InventoryDateViewer({ selectedDate, parts: propParts }: 
                     onPress={() => { addItem(); setEditingRowIndex(inventoryItems.length); }}
                     style={styles.addAnotherButton}
                     variant="outline"
-                    icon={<MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />}
+                    icon={<MaterialCommunityIcons name="plus" size={20} color={isDark ? colors.textPrimary : colors.primary} />}
+                />
+
+                <Button
+                    title="Save Changes"
+                    onPress={handleSaveChanges}
+                    loading={saving}
+                    style={styles.saveChangesButton}
+                    icon={<MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
                 />
             </Card>
+
+            <QRScanner
+                visible={scannerVisible}
+                onClose={() => {
+                    setScannerVisible(false);
+                    setLocationScanItemIndex(null);
+                    locationScanItemIndexRef.current = null;
+                }}
+                onScan={handleLocationScan}
+                title="Scan Location QR (Rack–Level–Bin)"
+            />
+
+            <SuccessModal
+                visible={successModal.visible}
+                onClose={() => setSuccessModal({ visible: false, message: '' })}
+                title="Success"
+                message={successModal.message}
+            />
         </>
     );
 }
@@ -433,36 +518,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    segmentedControl: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.border,
-        borderRadius: BORDER_RADIUS.sm,
-        padding: 2,
-    },
-    segmentButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: BORDER_RADIUS.sm - 2,
-    },
-    segmentLeft: {
-        marginRight: 2,
-    },
-    segmentRight: {
-        marginLeft: 2,
-    },
-    segmentActive: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    segmentText: {
+    headerCount: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '500',
     },
     loadingContainer: {
         padding: SPACING.xl,
@@ -570,32 +628,21 @@ const styles = StyleSheet.create({
     },
     addAnotherButton: {
         marginTop: SPACING.md,
+        marginBottom: SPACING.md,
+    },
+    saveChangesButton: {
         marginBottom: SPACING.xl,
     },
     searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
         marginTop: SPACING.md,
-        gap: SPACING.sm,
+        marginBottom: SPACING.sm,
     },
-    searchIcon: {
-        marginLeft: SPACING.sm,
-        marginRight: -35, // Adjust this so the icon sits inside the input field padding
-        zIndex: 1,
-    },
-    clearSearchBtn: {
-        position: 'absolute',
-        right: SPACING.sm,
-        padding: SPACING.xs,
-    },
-    tableScrollView: {
-        maxHeight: 450,
-        backgroundColor: COLORS.card,
+    tableWrapper: {
         borderRadius: BORDER_RADIUS.md,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: COLORS.border,
         marginTop: SPACING.sm,
+        marginBottom: SPACING.md,
     },
     tableHeader: {
         flexDirection: 'row',
