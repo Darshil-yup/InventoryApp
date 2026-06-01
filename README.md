@@ -13,7 +13,7 @@ This system uses a serverless-style **Google Sheets database architecture** comb
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 The following diagram illustrates how the frontend app communicates with the FastAPI service, which coordinates with an in-memory TTL caching layer to read and write rows to the Google Sheets workbook.
 
@@ -52,7 +52,7 @@ sequenceDiagram
 
 ---
 
-## ⚡ Technical Highlights & Features
+## Technical Highlights & Features
 
 *   **Sheets-as-a-Database (gspread)**: Fully operational Google Sheets integration. Replaces expensive SQL database setups with a collaborative workbook that non-technical office staff can view, format, and audit in real-time.
 *   **High-Performance Caching Layer**: Prebuilds an `O(1)` parts lookup map in server memory. Employs a per-key TTL (Time-To-Live) cache on `gspread` query outputs to bypass Google Sheets' strict API limit (300 requests/minute) and keep endpoint latencies under 150ms.
@@ -63,7 +63,7 @@ sequenceDiagram
 
 ---
 
-## 📂 Codebase Directory Structure
+## Codebase Directory Structure
 
 ```
 ├── .github/workflows/       # GitHub Actions CI/CD workflows
@@ -86,7 +86,7 @@ sequenceDiagram
 
 ---
 
-## 🔧 Installation & Local Setup
+## Installation & Local Setup
 
 ### Prerequisites
 *   Python 3.11+
@@ -140,7 +140,7 @@ Use the Expo Go app or an emulator (iOS/Android) to scan the QR code and test th
 
 ---
 
-## 🧪 Testing
+## Testing
 
 We use **Pytest** for backend route verification. The test suite is completely mocked using Python's `unittest.mock` to avoid making physical calls to Google Sheets, allowing developers to execute test suites offline in seconds.
 
@@ -154,7 +154,7 @@ pytest ../tests/test_backend.py -v
 
 ---
 
-## 📲 Screenshots & User Flow
+## Screenshots & User Flow
 
 Below is the step-by-step user workflow of the mobile application, showcasing its responsive dark/light modes and key features:
 
@@ -172,6 +172,6 @@ Below is the step-by-step user workflow of the mobile application, showcasing it
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
