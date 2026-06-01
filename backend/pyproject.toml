@@ -1,0 +1,27 @@
+[tool.ruff]
+# Enable Pyflakes (F) and PEP8 (E, W) codes by default
+select = ["E", "F", "W", "I"]
+ignore = []
+
+# Exclude typical build/cache folders
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+]
+
+# Set the line length limit
+line-length = 100
+
+# Target Python 3.11
+target-version = "py311"
+
+[tool.ruff.mccabe]
+max-complexity = 10
+
+[tool.ruff.isort]
+combine-as-imports = true
+lines-after-imports = 2

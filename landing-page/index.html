@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Smart Inventory Management powered by Google Sheets. Track parts, accounts, and addresses seamlessly on iOS and Android.">
+    <title>Inventory App - Smart Inventory Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo-section">
+                <img src="assets/logo.png" alt="Company Logo" class="logo">
+            </div>
+            <div class="nav-links">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#how-it-works" class="nav-link">How It Works</a>
+                <a href="#download" class="nav-link">Download</a>
+                <a href="#contact" class="nav-link btn-primary">Get Started</a>
+            </div>
+            <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-background">
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+        </div>
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1 class="hero-title">
+                        <span class="text-gradient">Smart Inventory</span><br>
+                        Management Made Simple
+                    </h1>
+                    <p class="hero-description">
+                        Transform your business with our powerful mobile inventory solution. 
+                        Track parts, manage accounts, and organize addresses—all powered by Google Sheets.
+                    </p>
+                    <div class="hero-buttons">
+                        <a href="#download" class="btn btn-primary btn-large">
+                            <span>Download Now</span>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M4 10L10 16L16 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M10 4V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </a>
+                        <a href="#features" class="btn btn-secondary btn-large">
+                            Learn More
+                        </a>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <div class="stat-number">100%</div>
+                            <div class="stat-label">Cloud Synced</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">3</div>
+                            <div class="stat-label">Core Features</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">24/7</div>
+                            <div class="stat-label">Access</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            <div class="app-preview"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Powerful Features for Modern Business</h2>
+                <p class="section-description">Everything you need to manage your inventory efficiently</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                            <rect x="5" y="5" width="12" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+                            <rect x="23" y="5" width="12" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+                            <rect x="5" y="23" width="12" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+                            <rect x="23" y="23" width="12" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Parts Management</h3>
+                    <p class="feature-description">
+                        Track inventory with import/export functionality. Monitor quantities, suppliers, 
+                        prices, and view recent transactions at a glance.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Import/Export tracking</li>
+                        <li>Real-time quantity updates</li>
+                        <li>Supplier management</li>
+                        <li>Transaction history</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                            <circle cx="20" cy="12" r="7" stroke="currentColor" stroke-width="2"/>
+                            <path d="M8 33C8 26 13 21 20 21C27 21 32 26 32 33" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Accounts Management</h3>
+                    <p class="feature-description">
+                        Organize all your business contacts in one place. Store account information, 
+                        contact persons, emails, and phone numbers with ease.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Contact information storage</li>
+                        <li>Email & phone tracking</li>
+                        <li>Custom notes for each account</li>
+                        <li>Quick access to contacts</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                            <path d="M20 5L25 15L35 16.5L27.5 24L29.5 34L20 29L10.5 34L12.5 24L5 16.5L15 15L20 5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Address Book</h3>
+                    <p class="feature-description">
+                        Maintain a comprehensive address database for shipping and billing. 
+                        Store complete location details for quick reference.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Complete address storage</li>
+                        <li>Shipping & billing locations</li>
+                        <li>City, state, country tracking</li>
+                        <li>Postal code management</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">How It Works</h2>
+                <p class="section-description">Get started in three simple steps</p>
+            </div>
+            <div class="steps-container">
+                <div class="step">
+                    <div class="step-number">01</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Download & Install</h3>
+                        <p class="step-description">
+                            Get the app on iOS or Android and complete the simple setup process
+                        </p>
+                    </div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step">
+                    <div class="step-number">02</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Connect Your Sheets</h3>
+                        <p class="step-description">
+                            Link your Google Sheets database for seamless cloud synchronization
+                        </p>
+                    </div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step">
+                    <div class="step-number">03</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Start Managing</h3>
+                        <p class="step-description">
+                            Begin tracking inventory, accounts, and addresses with real-time updates
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benefits Section -->
+    <section class="benefits">
+        <div class="container">
+            <div class="benefits-content">
+                <div class="benefits-text">
+                    <h2 class="section-title">Why Choose Our Solution?</h2>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="benefit-content">
+                            <h3>Cross-Platform Compatibility</h3>
+                            <p>Works seamlessly on iOS and Android devices, tablets included</p>
+                        </div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="benefit-content">
+                            <h3>Google Sheets Integration</h3>
+                            <p>Leverage the power of Google Sheets as your database with instant sync</p>
+                        </div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="benefit-content">
+                            <h3>Real-Time Updates</h3>
+                            <p>Pull-to-refresh functionality ensures you always have the latest data</p>
+                        </div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="benefit-content">
+                            <h3>Intuitive Interface</h3>
+                            <p>Clean, modern UI with floating action buttons and card-based views</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="benefits-visual">
+                    <div class="floating-card card-1">
+                        <div class="card-header">Parts</div>
+                        <div class="card-body">
+                            <div class="mini-stat">
+                                <div class="mini-label">Total Items</div>
+                                <div class="mini-value">342</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="floating-card card-2">
+                        <div class="card-header">Accounts</div>
+                        <div class="card-body">
+                            <div class="mini-stat">
+                                <div class="mini-label">Active</div>
+                                <div class="mini-value">87</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="floating-card card-3">
+                        <div class="card-header">Addresses</div>
+                        <div class="card-body">
+                            <div class="mini-stat">
+                                <div class="mini-label">Locations</div>
+                                <div class="mini-value">54</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download" class="download">
+        <div class="container">
+            <div class="download-card">
+                <h2 class="section-title">Ready to Get Started?</h2>
+                <p class="section-description">Download the app and revolutionize your inventory management today</p>
+                <div class="download-buttons">
+                    <a href="#" class="download-btn">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M25.5 16c0-.5 0-1-.1-1.5-1.4.2-3 1-4 2.3-.8 1.1-.7 2.8.3 4 1.2-.1 2.5-.9 3.2-2 .4-.6.6-1.4.6-2.2v-.6zm-2.8-4.4c-.9 1-1.4 2.3-1.3 3.7 1.4.1 2.7-.7 3.5-1.9.8-1.2.8-2.8 0-4-.7.8-1.4 1.5-2.2 2.2z"/>
+                            <path d="M16 2C8.3 2 2 8.3 2 16s6.3 14 14 14 14-6.3 14-14S23.7 2 16 2zm7.9 19.3c-.5 1.1-1.2 2-2.1 2.7-.9.8-2 1.2-3.2 1.2-1 0-2-.3-2.8-.8-.6-.4-1.3-.6-2-.6s-1.4.2-2 .6c-.8.5-1.7.8-2.8.8-1.2 0-2.3-.4-3.2-1.2-.9-.7-1.6-1.6-2.1-2.7C3.2 20.2 3 19.1 3 18c0-2.1.7-3.9 2-5.4 1.3-1.4 3-2.2 5-2.4.7 0 1.5.1 2.2.4.5.2 1 .3 1.5.3s1-.1 1.5-.3c.7-.3 1.5-.4 2.2-.4 2 .2 3.7 1 5 2.4 1.3 1.5 2 3.3 2 5.4 0 1.1-.2 2.2-.7 3.3z"/>
+                        </svg>
+                        <div class="download-text">
+                            <div class="download-label">Download on the</div>
+                            <div class="download-store">App Store</div>
+                        </div>
+                    </a>
+                    <a href="#" class="download-btn">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M3.6 3.2c-.2.3-.3.7-.3 1.2v23.2c0 .5.1.9.3 1.2l.1.1 13-13v-.3l-13-13-.1.1z"/>
+                            <path d="M21 19.7l-4.3-4.3v-.3l4.3-4.3.1.1 5.1 2.9c1.5.8 1.5 2.2 0 3.1l-5.1 2.9-.1-.1z"/>
+                            <path d="M21.1 19.6l-4.4-4.4-13.1 13.1c.5.5 1.3.6 2.2.1l15.3-8.8"/>
+                            <path d="M21.1 12.4L5.8 3.6c-.9-.5-1.7-.4-2.2.1l13.1 13.1 4.4-4.4z"/>
+                        </svg>
+                        <div class="download-text">
+                            <div class="download-label">GET IT ON</div>
+                            <div class="download-store">Google Play</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer id="contact" class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <img src="assets/logo.png" alt="Company Logo" class="footer-logo">
+                    <p class="footer-description">
+                        Smart inventory management powered by Google Sheets. 
+                        Track, manage, and organize with ease.
+                    </p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-title">Product</h4>
+                    <ul class="footer-links">
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#download">Download</a></li>
+                        <li><a href="#">Pricing</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-title">Support</h4>
+                    <ul class="footer-links">
+                        <li><a href="#">Documentation</a></li>
+                        <li><a href="#">API Reference</a></li>
+                        <li><a href="#">Contact Us</a></li>
+                        <li><a href="#">FAQs</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-title">Legal</h4>
+                    <ul class="footer-links">
+                        <li><a href="#">Privacy Policy</a></li>
+                        <li><a href="#">Terms of Service</a></li>
+                        <li><a href="#">Cookie Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Inventory App. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
