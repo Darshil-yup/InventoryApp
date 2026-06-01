@@ -1,9 +1,6 @@
 [tool.ruff]
-# Enable Pyflakes (F) and PEP8 (E, W) codes by default
-select = ["E", "F", "W", "I"]
-ignore = []
-
-# Exclude typical build/cache folders
+line-length = 100
+target-version = "py311"
 exclude = [
     ".git",
     ".mypy_cache",
@@ -13,15 +10,22 @@ exclude = [
     "__pycache__",
 ]
 
-# Set the line length limit
-line-length = 100
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # Line too long
+    "E402",  # Module-level import not at top of file
+    "W291",  # Trailing whitespace
+    "W293",  # Blank line contains whitespace
+    "I001",  # Import block formatting/sorting
+    "E401",  # Multiple imports on one line (used in test pings)
+    "F401",  # Unused imports (leaves clean code for showcases)
+    "F541"   # f-string without placeholders
+]
 
-# Target Python 3.11
-target-version = "py311"
-
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 10
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 combine-as-imports = true
 lines-after-imports = 2

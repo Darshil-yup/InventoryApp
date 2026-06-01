@@ -12,9 +12,9 @@ interface GradientBackgroundProps {
 export default function GradientBackground({ children, style }: GradientBackgroundProps) {
     const { isDark } = useTheme();
 
-    const gradientColors = isDark
+    const gradientColors = (isDark
         ? [DARK_COLORS.background, DARK_COLORS.primary]
-        : [LIGHT_COLORS.primary, LIGHT_COLORS.primaryLight];
+        : [LIGHT_COLORS.primary, LIGHT_COLORS.primaryLight]) as [string, string];
 
     const bgColor = isDark ? DARK_COLORS.background : LIGHT_COLORS.primary;
 
